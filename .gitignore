@@ -4,6 +4,9 @@
 # Images # 
 *.png
 
+# HTML Outputs #
+*.html
+
 # R configs #
 .Rhistory
 .RData

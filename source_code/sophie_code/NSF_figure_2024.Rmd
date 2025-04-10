@@ -1,0 +1,85 @@
+---
+title: "NSF figure"
+output: html_notebook
+  output:
+  pdf_document: default
+  html_document: default
+
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(cowplot)
+library(readxl)
+library(MetBrewer)
+library(ggrepel)
+library(ggpubr)
+library(scales)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(RColorBrewer)
+```
+
+## Data
+
+```{r}
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+dataTexampAll <- read_csv("../../Data/data_figures/dataTexampAll.csv")
+dataCont <- read_csv("../../Data/data_figures/dataCont.csv")
+dataTstar <- read_csv("../../Data/data_figures/dataTstar.csv", 
+                      col_types = cols (state = "c")) %>%
+  filter(country != "Kenya")
+levN <- unique(dataTstar %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+```
+
+
+## Figure 2: Trends over time by country
+
+```{r}
+dataPlot <- dataTexampAll %>% left_join(dataCont) %>%
+  pivot_longer(cols = H:L,names_to = "SES", values_to = "PropV") %>%
+  arrange(continent) %>% mutate(Name = factor(Name, levels = levN)) %>%
+  mutate(SES = recode(SES, H = "High SES", L = "Low SES"), PropV = 100*PropV) %>%
+  filter(continent == "North America")
+
+dataPlotComp <- dataPlot %>% group_by(Name) %>% 
+  filter(week == max(week), type == "predicted") %>%
+  ungroup() %>% select(Name, SES, PropV) %>%
+  pivot_wider(names_from = SES, values_from = PropV) %>%
+  mutate(HH = if_else(`High SES`>`Low SES`,1,0))
+
+
+plot <- dataPlot %>% filter(type == "predicted", 
+         Name %in% c("United States, IL", "United States, CA", 
+                     "United States, NY")) %>%
+  mutate(State = recode(Name, "United States, IL" = "Illinois", 
+                        "United States, CA" = "California",
+                        "United States, NY" = "New York")) %>%
+  ggplot(aes(week, PropV, linetype = SES, col = State)) + 
+  #facet_wrap(~Name, scales = "free", nrow = 1) + 
+  geom_line(size = 1) + theme_minimal() + 
+  scale_color_manual(values = c("darkgoldenrod3","deepskyblue4","plum4")) + 
+  labs(linetype='Socioeconomic\nstatus') + 
+  scale_x_continuous("Week", breaks = seq(0,50,10), limits = c(0,56)) + 
+  scale_y_continuous("Percentage of the population\nvaccinated with at least one dose",
+                     breaks = seq(0,90,30), limits = c(0,93)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 11),
+        legend.title = element_text(color = "black", size = 10),
+        legend.text = element_text(color = "black", size = 9),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 11),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.key.width = unit(0.35,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.y = element_text(margin = margin(r = 7)),
+        axis.title.x = element_text(margin = margin(t = 7)))
+plot
+
+ggsave("../../Figures/figure_NSF_2024.pdf", plot, width = 5, height = 3)
+```

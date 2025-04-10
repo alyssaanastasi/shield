@@ -1,0 +1,890 @@
+---
+title: "SEIR Model - Alyssa"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+## ODE solver
+library(deSolve)
+## Making figures/plots
+library(MetBrewer)
+library(directlabels)
+library(cowplot)
+library(viridis)
+library(RColorBrewer)
+library(MetBrewer)
+library(ggrepel)
+library(spatstat.utils)
+## stats
+library(scales)
+library(Hmisc)
+library(zoo)
+library(lubridate)
+library(parallel)
+library(MMWRweek)
+library(dplyr)
+```
+
+# Jon Zelner model
+## Model equations
+```{r}
+seg_model <- function(t, y, pars){ 
+  # in the function call, t is the vector of time steps, y is the current state, pars is the vector of parameters
+  
+  # Parameters
+  beta <- pars["beta"] 
+  rho <- pars["rho"]
+  epsilon <- pars["epsilon"]
+  gamma <- pars["gamma"]
+  tau <- pars["tau"]
+  
+  # State variables
+  
+  S1 <- y[1]
+  S2 <- y[2]
+  I1 <- y[3]
+  I2 <- y[4]
+  
+  # Equations #
+  
+  N1 <- I1 + S1
+  N2 <- I2 + S2
+  N <- N1 + N2
+  
+  lambda_1 <- beta*rho*S1*(epsilon*I1/N1 + (1-epsilon)*((I1 + I2)/N))
+  lambda_2 <- beta*S2*(epsilon*I2/N2 + (1-epsilon)*((I1 + I2)/N))
+  rho <- 1 + (tau-1)*epsilon
+  
+  
+  dS1 <- -lambda_1 + gamma*I1
+  dS2 <- -lambda_2 + gamma*I2
+  dI1 <- lambda_1 - gamma*I1
+  dI2 <- lambda_2 - gamma*I2
+  
+  # Return list of gradients
+  list(c(dS1, dS2, dI1, dI2))
+}
+```
+
+## Model params
+```{r}
+# General parameters #
+PopT <- 1000
+Pop1 <- PopT/2 
+Pop2 <- PopT/2
+names_var <- c("S1", "S2", "I1", "I2")
+init <- rep(0,length(names_var))
+names(init) <- names_var
+init["S1"] <- Pop1 - 1
+init["I1"] <- 1
+init["S2"] <- Pop2 - 1
+init["I2"] <- 1 
+
+
+parms <- c(beta = 0.5, rho = 1.2, epsilon = 0.2, gamma = 1/7, tau=1.2)
+```
+
+## Run model
+```{r}
+times <- 1:200
+
+out_seg <- ode(y=init, func = seg_model, times=times, parms = parms, method = "euler") %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+```
+
+## Plot model
+```{r}
+
+plot_out_seg <- out_seg %>%
+  ggplot(aes(x = time, y = value, color = name)) + 
+  geom_line() 
+plot_out_seg
+
+```
+
+
+# Revised model
+## Equations
+```{r}
+
+# Seasonality function
+# Jan: 0 ... Dec: 12
+season_func <- function(peak_forcing, start_time, t){
+  beta_modify <- peak_forcing * (cos((t+start_time*365/12)*2*pi/365)) + 1.0001
+  return(beta_modify)
+}
+
+seg_model_adapted <- function(t, y, pars){
+  # Parameters
+  beta <- pars["beta"] ## transmission rate
+  epsilon <- pars["epsilon"] ## relative mixing
+  phi <- pars["phi"] ## latent period
+  gamma <- pars["gamma"] ## recovery rate
+  sigma <- pars["sigma"] ## infection fatality rate
+  omega <- pars["omega"] ## waning of immunity
+  
+  nu_asian_child <- pars["nu_asian_child"] ## vaccination rate
+  nu_black_child <- pars["nu_black_child"] ## vaccination rate
+  nu_latino_child <- pars["nu_latino_child"] ## vaccination rate
+  nu_natam_child<- pars["nu_natam_child"] ## vaccination rate
+  nu_nhpi_child <- pars["nu_nhpi_child"] ## vaccination rate
+  nu_white_child <- pars["nu_white_child"] ## vaccination rate
+
+  nu_asian_adult <- pars["nu_asian_adult"] ## vaccination rate
+  nu_black_adult <- pars["nu_black_adult"] ## vaccination rate
+  nu_latino_adult <- pars["nu_latino_adult"] ## vaccination rate
+  nu_natam_adult <- pars["nu_natam_adult"] ## vaccination rate
+  nu_nhpi_adult <- pars["nu_nhpi_adult"] ## vaccination rate
+  nu_white_adult <- pars["nu_white_adult"] ## vaccination rate
+  
+  zeta_asian_child <- pars["zeta_asian_child"] ## testing rate
+  zeta_black_child <- pars["zeta_black_child"] ## testing rate
+  zeta_latino_child <- pars["zeta_latino_child"] ## testing rate
+  zeta_natam_child <- pars["zeta_natam_child"] ## testing rate
+  zeta_nhpi_child <- pars["zeta_nhpi_child"] ## testing rate
+  zeta_white_child <- pars["zeta_white_child"] ## testing rate
+  
+  zeta_asian_adult <- pars["zeta_asian_adult"] ## testing rate
+  zeta_black_adult <- pars["zeta_black_adult"] ## testing rate
+  zeta_latino_adult <- pars["zeta_latino_adult"] ## testing rate
+  zeta_natam_adult <- pars["zeta_natam_adult"] ## testing rate
+  zeta_nhpi_adult <- pars["zeta_nhpi_adult"] ## testing rate
+  zeta_white_adult <- pars["zeta_white_adult"] ## testing rate
+  
+  tau_asian_i_child <- pars["tau_asian_i_child"] ## maximum vulnerability, asian, infection
+  tau_black_i_child <- pars["tau_black_i_child"] ## maximum vulnerability, black, infection
+  tau_latino_i_child <- pars["tau_latino_i_child"] ## maximum vulnerability, latino, infection
+  tau_natam_i_child <- pars["tau_natam_i_child"] ## maximum vulnerability, native american, infection
+  tau_nhpi_i_child <- pars["tau_nhpi_i_child"] ## maximum vulnerability, native hawaiian/pacific islander, infection
+
+  tau_asian_i_adult <- pars["tau_asian_i_adult"] ## maximum vulnerability, asian, infection
+  tau_black_i_adult <- pars["tau_black_i_adult"] ## maximum vulnerability, black, infection
+  tau_latino_i_adult <- pars["tau_latino_i_adult"] ## maximum vulnerability, latino, infection
+  tau_natam_i_adult <- pars["tau_natam_i_adult"] ## maximum vulnerability, native american, infection
+  tau_nhpi_i_adult <- pars["tau_nhpi_i_adult"] ## maximum vulnerability, native hawaiian/pacific islander, infection
+  
+  tau_asian_d_child <- pars["tau_asian_d_child"] ## maximum vulnerability, asian, death
+  tau_black_d_child <- pars["tau_black_d_child"] ## maximum vulnerability, black, death
+  tau_latino_d_child <- pars["tau_latino_d_child"] ## maximum vulnerability, latino, death
+  tau_natam_d_child <- pars["tau_natam_d_child"] ## maximum vulnerability, native american, death
+  tau_nhpi_d_child <- pars["tau_nhpi_d_child"] ## maximum vulnerability, native hawaiian/pacific islander, death
+  
+  tau_asian_d_adult <- pars["tau_asian_d_adult"] ## maximum vulnerability, asian, death
+  tau_black_d_adult <- pars["tau_black_d_adult"] ## maximum vulnerability, black, death
+  tau_latino_d_adult <- pars["tau_latino_d_adult"] ## maximum vulnerability, latino, death
+  tau_natam_d_adult <- pars["tau_natam_d_adult"] ## maximum vulnerability, native american, death
+  tau_nhpi_d_adult <- pars["tau_nhpi_d_adult"] ## maximum vulnerability, native hawaiian/pacific islander, death
+  
+
+  # State variables
+  S_asian_child <- y[1]
+  S_asian_adult <- y[2]
+  S_black_child <- y[3]
+  S_black_adult <- y[4]
+  S_latino_child <- y[5]
+  S_latino_adult <- y[6]
+  S_natam_child <- y[7]
+  S_natam_adult <- y[8]
+  S_nhpi_child <- y[9]
+  S_nhpi_adult <- y[10]
+  S_white_child <- y[11]
+  S_white_adult <- y[12]
+  
+  E_asian_child <- y[13]
+  E_asian_adult <- y[14]
+  E_black_child <- y[15]
+  E_black_adult <- y[16]
+  E_latino_child <- y[17]
+  E_latino_adult <- y[18]
+  E_natam_child <- y[19]
+  E_natam_adult <- y[20]
+  E_nhpi_child <- y[21]
+  E_nhpi_adult <- y[22]
+  E_white_child <- y[23]
+  E_white_adult <- y[24]
+  
+  I_asian_child <- y[25]
+  I_asian_adult <- y[26]
+  I_black_child <- y[27]
+  I_black_adult <- y[28]
+  I_latino_child <- y[29]
+  I_latino_adult <- y[30]
+  I_natam_child <- y[31]
+  I_natam_adult <- y[32]
+  I_nhpi_child <- y[33]
+  I_nhpi_adult <- y[34]
+  I_white_child <- y[35] 
+  I_white_adult <- y[36]
+  
+  T_asian_child <- y[37]
+  T_asian_adult <- y[38]
+  T_black_child <- y[39]
+  T_black_adult <- y[40]
+  T_latino_child <- y[41]
+  T_latino_adult <- y[42]
+  T_natam_child <- y[43]
+  T_natam_adult <- y[44]
+  T_nhpi_child <- y[45]
+  T_nhpi_adult <- y[46]
+  T_white_child <- y[47]
+  T_white_adult <- y[48]
+  
+  R_asian_child <- y[49]
+  R_asian_adult <- y[50]
+  R_black_child <- y[51]
+  R_black_adult <- y[52]
+  R_latino_child <- y[53]
+  R_latino_adult <- y[54]
+  R_natam_child <- y[55]
+  R_natam_adult <- y[56]
+  R_nhpi_child <- y[57]
+  R_nhpi_adult <- y[58]
+  R_white_child <- y[59]
+  R_white_adult <- y[60]
+  
+  D_asian_child <- y[61]
+  D_asian_adult <- y[62]
+  D_black_child <- y[63]
+  D_black_adult <- y[64]
+  D_latino_child <- y[65]
+  D_latino_adult <- y[66]
+  D_natam_child <- y[67]
+  D_natam_adult <- y[68]
+  D_nhpi_child <- y[69]
+  D_nhpi_adult <- y[70]
+  D_white_child <- y[71]
+  D_white_adult <- y[72]
+  
+C_asian_child <- y[73]
+C_asian_adult <- y[74]
+C_black_child <- y[75]
+C_black_adult <- y[76]
+C_latino_child <- y[77]
+C_latino_adult <- y[78]
+C_natam_child <- y[79]
+C_natam_adult <- y[80]
+C_nhpi_child <- y[81]
+C_nhpi_adult <- y[82]
+C_white_child <- y[83]
+C_white_adult <- y[84]
+  
+
+#Total count equations by race
+  N_asian_child <- S_asian_child + E_asian_child + I_asian_child + T_asian_child + R_asian_child 
+  N_asian_adult <- S_asian_adult + E_asian_adult + I_asian_adult + T_asian_adult + R_asian_adult 
+  
+  N_black_child <- S_black_child + E_black_child + I_black_child + T_black_child + R_black_child 
+  N_black_adult <- S_black_adult + E_black_adult + I_black_adult + T_black_adult + R_black_adult 
+  
+  N_latino_child <- S_latino_child + E_latino_child + I_latino_child + T_latino_child + R_latino_child 
+  N_latino_adult <- S_latino_adult + E_latino_adult + I_latino_adult + T_latino_adult + R_latino_adult
+  
+  N_natam_child <- S_natam_child + E_natam_child + I_natam_child + T_natam_child + R_natam_child 
+  N_natam_adult <- S_natam_adult + E_natam_adult + I_natam_adult + T_natam_adult + R_natam_adult
+  
+  N_nhpi_child <- S_nhpi_child + E_nhpi_child + I_nhpi_child + T_nhpi_child + R_nhpi_child 
+  N_nhpi_adult <- S_nhpi_adult + E_nhpi_adult + I_nhpi_adult + T_nhpi_adult + R_nhpi_adult
+  
+  N_white_child <- S_white_child + E_white_child + I_white_child + T_white_child + R_white_child
+  N_white_adult <- S_white_adult + E_white_adult + I_white_adult + T_white_adult + R_white_adult 
+
+  #Total count equations
+  N_adult <- N_asian_adult + N_black_adult + N_latino_adult + N_natam_adult + N_nhpi_adult + N_white_adult
+  N_child <- N_asian_child + N_black_child + N_latino_child + N_natam_child + N_nhpi_child + N_white_child
+  N_all <- N_asian_adult + N_black_adult + N_latino_adult + N_natam_adult + N_nhpi_adult + N_white_adult + N_asian_child + N_black_child + N_latino_child + N_natam_child + N_nhpi_child + N_white_child
+  
+  I_eff_adult <- I_asian_adult + I_black_adult + I_latino_adult + I_natam_adult + I_nhpi_adult + I_white_adult
+  I_eff_child <- I_asian_child + I_black_child + I_latino_child + I_natam_child + I_nhpi_child + I_white_child
+  I_eff_all <- I_asian_adult + I_black_adult + I_latino_adult + I_natam_adult + I_nhpi_adult + I_white_adult + I_asian_child + I_black_child + I_latino_child + I_natam_child + I_nhpi_child + I_white_child
+  
+  #Parameter equations
+  rho_asian_i_child <- 1 + (tau_asian_i_child-1)*epsilon
+  rho_asian_i_adult <- 1 + (tau_asian_i_adult-1)*epsilon
+  rho_black_i_child <- 1 + (tau_black_i_child-1)*epsilon
+  rho_black_i_adult <- 1 + (tau_black_i_adult-1)*epsilon
+  rho_latino_i_child <- 1 + (tau_latino_i_child-1)*epsilon
+  rho_latino_i_adult <- 1 + (tau_latino_i_adult-1)*epsilon
+  rho_natam_i_child <- 1 + (tau_natam_i_child-1)*epsilon
+  rho_natam_i_adult <- 1 + (tau_natam_i_adult-1)*epsilon
+  rho_nhpi_i_child <- 1 + (tau_nhpi_i_child-1)*epsilon
+  rho_nhpi_i_adult <- 1 + (tau_nhpi_i_adult-1)*epsilon
+  
+  rho_asian_d_child <- 1 + (tau_asian_d_child-1)*epsilon
+  rho_asian_d_adult <- 1 + (tau_asian_d_adult-1)*epsilon
+  rho_black_d_child <- 1 + (tau_black_d_child-1)*epsilon
+  rho_black_d_adult <- 1 + (tau_black_d_adult-1)*epsilon
+  rho_latino_d_child <- 1 + (tau_latino_d_child-1)*epsilon
+  rho_latino_d_adult <- 1 + (tau_latino_d_adult-1)*epsilon
+  rho_natam_d_child <- 1 + (tau_natam_d_child-1)*epsilon
+  rho_natam_d_adult <- 1 + (tau_natam_d_adult-1)*epsilon
+  rho_nhpi_d_child <- 1 + (tau_nhpi_d_child-1)*epsilon
+  rho_nhpi_d_adult <- 1 + (tau_nhpi_d_adult-1)*epsilon
+  
+  lambda_asian_child <- season_func(1, 3, t)*beta*rho_asian_i_child*S_asian_child*(epsilon*S_asian_child/N_asian_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_asian_adult <- season_func(1, 3, t)*beta*rho_asian_i_adult*S_asian_adult*(epsilon*S_asian_adult/N_asian_adult + (1-epsilon)*(I_eff_all/N_all))
+  lambda_black_child <- season_func(1, 3, t)*beta*rho_black_i_child*S_black_child*(epsilon*S_black_child/N_black_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_black_adult <- season_func(1, 3, t)*beta*rho_black_i_adult*S_black_adult*(epsilon*S_black_adult/N_black_adult + (1-epsilon)*(I_eff_all/N_all))
+  lambda_latino_child <- season_func(1, 3, t)*beta*rho_latino_i_child*S_latino_child*(epsilon*S_latino_child/N_latino_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_latino_adult <- season_func(1, 3, t)*beta*rho_latino_i_adult*S_latino_adult*(epsilon*S_latino_adult/N_latino_adult + (1-epsilon)*(I_eff_all/N_all))
+  lambda_natam_child <- season_func(1, 3, t)*beta*rho_natam_i_child*S_natam_child*(epsilon*S_natam_child/N_natam_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_natam_adult <- season_func(1, 3, t)*beta*rho_natam_i_adult*S_natam_adult*(epsilon*S_natam_adult/N_natam_adult + (1-epsilon)*(I_eff_all/N_all))
+  lambda_nhpi_child <- season_func(1, 3, t)*beta*rho_nhpi_i_child*S_nhpi_child*(epsilon*S_nhpi_child/N_nhpi_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_nhpi_adult <- season_func(1, 3, t)*beta*rho_nhpi_i_adult*S_nhpi_adult*(epsilon*S_nhpi_adult/N_nhpi_adult + (1-epsilon)*(I_eff_all/N_all))
+  lambda_white_child <- season_func(1, 3, t)*beta*S_white_child*(epsilon*S_white_child/N_white_child + (1-epsilon)*(I_eff_all/N_all))
+  lambda_white_adult <- season_func(1, 3, t)*beta*S_white_adult*(epsilon*S_white_adult/N_white_adult + (1-epsilon)*(I_eff_all/N_all))
+  
+  sigma_asian_child <- rho_asian_d_child*sigma
+  sigma_asian_adult <- rho_asian_d_adult*sigma
+  sigma_black_child <- rho_black_d_child*sigma
+  sigma_black_adult <- rho_black_d_adult*sigma
+  sigma_latino_child <- rho_latino_d_child*sigma
+  sigma_latino_adult <- rho_latino_d_adult*sigma
+  sigma_natam_child <- rho_natam_d_child*sigma
+  sigma_natam_adult <- rho_natam_d_adult*sigma
+  sigma_nhpi_child <- rho_nhpi_d_child*sigma
+  sigma_nhpi_adult <- rho_nhpi_d_adult*sigma
+  sigma_white_child <- sigma
+  sigma_white_adult <- sigma
+
+  #Differential Equations
+  #susceptible
+  dS_asian_child <- -lambda_asian_child + omega*R_asian_child - nu_asian_child*S_asian_child - (1/18*S_asian_child) + (1/60*N_asian_adult)
+  dS_asian_adult <- -lambda_asian_adult + omega*R_asian_adult - nu_asian_adult*S_asian_adult + (1/18*S_asian_child) -(1/60*N_asian_adult)
+  dS_black_child <- -lambda_black_child + omega*R_black_child - nu_black_child*S_black_child - (1/18*S_black_child) + (1/60*N_black_adult)
+  dS_black_adult <- -lambda_black_adult + omega*R_black_adult - nu_black_adult*S_black_adult + (1/18*S_black_child) -(1/60*N_black_adult)
+  dS_latino_child <- -lambda_latino_child + omega*R_latino_child - nu_latino_child*S_latino_child - (1/18*S_latino_child) + (1/60*N_latino_adult)
+  dS_latino_adult <- -lambda_latino_adult + omega*R_latino_adult - nu_latino_adult*S_latino_adult + (1/18*S_latino_child)-(1/60*N_latino_adult)
+  dS_natam_child <- -lambda_natam_child + omega*R_natam_child - nu_natam_child*S_natam_child - (1/18*S_natam_child) + (1/60*N_natam_adult)
+  dS_natam_adult <- -lambda_natam_adult + omega*R_natam_adult - nu_natam_adult*S_natam_adult + (1/18*S_natam_child)-(1/60*N_natam_adult)
+  dS_nhpi_child <- -lambda_nhpi_child + omega*R_nhpi_child - nu_nhpi_child*S_nhpi_child - (1/18*S_nhpi_child) + (1/60*N_nhpi_adult)
+  dS_nhpi_adult <- -lambda_nhpi_adult + omega*R_nhpi_adult - nu_nhpi_adult*S_nhpi_adult + (1/18*S_nhpi_child)-(1/60*N_nhpi_adult)
+  dS_white_child <- -lambda_white_child + omega*R_white_child - nu_white_child*S_white_child - (1/18*S_white_child) + (1/60*N_white_adult)
+  dS_white_adult <- -lambda_white_adult + omega*R_white_adult - nu_white_adult*S_white_adult + (1/18*S_white_child)-(1/60*N_white_adult)
+  
+  #exposed
+  dE_asian_child <- + lambda_asian_child - phi*E_asian_child - (1/18*E_asian_child)
+  dE_asian_adult <- + lambda_asian_adult - phi*E_asian_adult + (1/18*E_asian_child) -(1/60*E_asian_adult)
+  dE_black_child <- + lambda_black_child - phi*E_black_child - (1/18*E_black_child) 
+  dE_black_adult <- + lambda_black_adult - phi*E_black_adult + (1/18*E_black_child) -(1/60*E_black_adult)
+  dE_latino_child <- + lambda_latino_child - phi*E_latino_child - (1/18*E_latino_child) 
+  dE_latino_adult <- + lambda_latino_adult - phi*E_latino_adult + (1/18*E_latino_child)-(1/60*E_latino_adult)
+  dE_natam_child <- + lambda_natam_child - phi*E_natam_child - (1/18*E_natam_child) 
+  dE_natam_adult <- + lambda_natam_adult - phi*E_natam_adult + (1/18*E_natam_child) -(1/60*E_natam_adult)
+  dE_nhpi_child <- + lambda_nhpi_child - phi*E_nhpi_child - (1/18*E_nhpi_child)
+  dE_nhpi_adult <- + lambda_nhpi_adult - phi*E_nhpi_adult + (1/18*E_nhpi_child) -(1/60*E_nhpi_adult)
+  dE_white_child <- + lambda_white_child - phi*E_white_child - (1/18*E_white_child) 
+  dE_white_adult <- + lambda_white_adult - phi*E_white_adult + (1/18*E_white_child) -(1/60*E_white_adult)
+
+  #infected
+  dI_asian_child <- + phi*E_asian_child - gamma*I_asian_child - zeta_asian_child*I_asian_child - (1/18*I_asian_child) 
+  dI_asian_adult <- + phi*E_asian_adult - gamma*I_asian_adult - zeta_asian_adult*I_asian_adult + (1/18*I_asian_child) - (1/60*I_asian_adult)
+  dI_black_child <- + phi*E_black_child - gamma*I_black_child - zeta_black_child*I_black_child - (1/18*I_black_child) 
+  dI_black_adult <- + phi*E_black_adult - gamma*I_black_adult - zeta_black_adult*I_black_adult + (1/18*I_black_child) - (1/60*I_black_adult)
+  dI_latino_child <- + phi*E_latino_child - gamma*I_latino_child - zeta_latino_child*I_latino_child - (1/18*I_latino_child)  
+  dI_latino_adult <- + phi*E_latino_adult - gamma*I_latino_adult - zeta_latino_adult*I_latino_adult + (1/18*I_latino_child)- (1/60*I_latino_adult)
+  dI_natam_child <- + phi*E_natam_child - gamma*I_natam_child - zeta_natam_child*I_natam_child - (1/18*I_natam_child) 
+  dI_natam_adult <- + phi*E_natam_adult - gamma*I_natam_adult - zeta_natam_adult*I_natam_adult + (1/18*I_natam_child)- (1/60*I_natam_adult) 
+  dI_nhpi_child <- + phi*E_nhpi_child - gamma*I_nhpi_child - zeta_nhpi_child*I_nhpi_child - (1/18*I_nhpi_child) 
+  dI_nhpi_adult <- + phi*E_nhpi_adult - gamma*I_nhpi_adult - zeta_nhpi_adult*I_nhpi_adult + (1/18*I_nhpi_child) - (1/60*I_nhpi_adult)
+  dI_white_child <- + phi*E_white_child - gamma*I_white_child - zeta_white_child*I_white_child - (1/18*I_white_child) 
+  dI_white_adult <- + phi*E_white_adult - gamma*I_white_adult - zeta_white_adult*I_white_adult + (1/18*I_white_child) - (1/60*I_white_adult)
+
+  #tested positive
+  dT_asian_child <- + zeta_asian_child*I_asian_child - gamma*T_asian_child - (1/18*T_asian_child) 
+  dT_asian_adult <- + zeta_asian_adult*I_asian_adult - gamma*T_asian_adult + (1/18*T_asian_child) - (1/60*T_asian_adult)
+  dT_black_child <- + zeta_black_child*I_black_child - gamma*T_black_child - (1/18*T_black_child) 
+  dT_black_adult <- + zeta_black_adult*I_black_adult - gamma*T_black_adult + (1/18*T_black_child) - (1/60*T_black_adult)
+  dT_latino_child <- + zeta_latino_child*I_latino_child - gamma*T_latino_child - (1/18*T_latino_child)  
+  dT_latino_adult <- + zeta_latino_adult*I_latino_adult - gamma*T_latino_adult + (1/18*T_latino_child) - (1/60*T_latino_adult)
+  dT_natam_child <- + zeta_natam_child*I_natam_child - gamma*T_natam_child - (1/18*T_natam_child) 
+  dT_natam_adult <- + zeta_natam_adult*I_natam_adult - gamma*T_natam_adult + (1/18*T_natam_child) - (1/60*T_natam_adult) 
+  dT_nhpi_child <- + zeta_nhpi_child*I_nhpi_child - gamma*T_nhpi_child - (1/18*T_nhpi_child)  
+  dT_nhpi_adult <- + zeta_nhpi_adult*I_nhpi_adult - gamma*T_nhpi_adult + (1/18*T_nhpi_child) - (1/60*T_nhpi_adult)
+  dT_white_child <- + zeta_white_child*I_white_child - gamma*T_white_child - (1/18*T_white_child) 
+  dT_white_adult <- + zeta_white_adult*I_white_adult - gamma*T_white_adult + (1/18*T_white_child) - (1/60*T_white_adult)
+
+  #recovered
+  dR_asian_child <- + (1-(sigma_asian_child))*gamma*(I_asian_child + T_asian_child) - omega*R_asian_child + nu_asian_child*S_asian_child - (1/18*R_asian_child) 
+  dR_asian_adult <- + (1-(sigma_asian_adult))*gamma*(I_asian_adult + T_asian_adult) - omega*R_asian_adult + nu_asian_adult*S_asian_adult + (1/18*R_asian_child) - (1/60*R_asian_adult)
+  dR_black_child <- + (1-(sigma_black_child))*gamma*(I_black_child + T_black_child) - omega*R_black_child + nu_black_child*S_black_child - (1/18*R_black_child) 
+  dR_black_adult <- + (1-(sigma_black_adult))*gamma*(I_black_adult + T_black_adult) - omega*R_black_adult + nu_black_adult*S_black_adult + (1/18*R_black_child)- (1/60*R_black_adult)
+  dR_latino_child <- + (1-(sigma_latino_child))*gamma*(I_latino_child + T_latino_child) - omega*R_latino_child + nu_latino_child*S_latino_child - (1/18*R_latino_child)
+  dR_latino_adult <- + (1-(sigma_latino_adult))*gamma*(I_latino_adult + T_latino_adult) - omega*R_latino_adult + nu_latino_adult*S_latino_adult + (1/18*R_latino_child) - (1/60*R_latino_adult)
+  dR_natam_child <- + (1-(sigma_natam_child))*gamma*(I_natam_child + T_natam_child) - omega*R_natam_child + nu_natam_child*S_natam_child - (1/18*R_natam_child)
+  dR_natam_adult <- + (1-(sigma_natam_adult))*gamma*(I_natam_adult + T_natam_adult) - omega*R_natam_adult + nu_natam_adult*S_natam_adult + (1/18*R_natam_child) - (1/60*R_natam_adult)
+  dR_nhpi_child <- + (1-(sigma_nhpi_child))*gamma*(I_nhpi_child + T_nhpi_child) - omega*R_nhpi_child + nu_nhpi_child*S_nhpi_child - (1/18*R_nhpi_child) 
+  dR_nhpi_adult <- + (1-(sigma_nhpi_adult))*gamma*(I_nhpi_adult + T_nhpi_adult) - omega*R_nhpi_adult + nu_nhpi_adult*S_nhpi_adult + (1/18*R_nhpi_child) - (1/60*R_nhpi_adult)
+  dR_white_child <- + (1-(sigma_white_child))*gamma*(I_white_child + T_white_child) - omega*R_white_child + nu_white_child*S_white_child - (1/18*R_white_child) 
+  dR_white_adult <- + (1-(sigma_white_adult))*gamma*(I_white_adult + T_white_adult) - omega*R_white_adult + nu_white_adult*S_white_adult + (1/18*R_white_child) - (1/60*R_white_adult)
+  
+  #disease realted deaths
+  dD_asian_child <- + sigma_asian_child*gamma*(I_asian_child + T_asian_child)
+  dD_asian_adult <- + sigma_asian_adult*gamma*(I_asian_adult + T_asian_adult)
+  dD_black_child <- + sigma_black_child*gamma*(I_black_child + T_black_child) 
+  dD_black_adult <- + sigma_black_adult*gamma*(I_black_adult + T_black_adult)
+  dD_latino_child <- + sigma_latino_child*gamma*(I_latino_child + T_latino_child)
+  dD_latino_adult <- + sigma_latino_adult*gamma*(I_latino_adult + T_latino_adult)
+  dD_natam_child <- + sigma_natam_child*gamma*(I_natam_child + T_natam_child)
+  dD_natam_adult <- + sigma_natam_adult*gamma*(I_natam_adult + T_natam_adult)
+  dD_nhpi_child <- + sigma_nhpi_child*gamma*(I_nhpi_child + T_nhpi_child)
+  dD_nhpi_adult <- + sigma_nhpi_adult*gamma*(I_nhpi_adult + T_nhpi_adult)
+  dD_white_child <- + sigma_white_child*gamma*(I_white_child + T_white_child)
+  dD_white_adult <- + sigma_white_adult*gamma*(I_white_adult + T_white_adult)
+
+#calculating dC, per race the number of people moving from Exposed to Infected
+#This is so we calculate the true number of infected people without accounting for them multiple times  
+  
+dC_asian_child <- + phi*E_asian_child
+dC_asian_adult <- + phi*E_asian_adult
+dC_black_child <- + phi*E_black_child
+dC_black_adult <- + phi*E_black_adult
+dC_latino_child <- + phi*E_latino_child
+dC_latino_adult <- + phi*E_latino_adult
+dC_natam_child <- + phi*E_natam_child
+dC_natam_adult <- + phi*E_natam_adult
+dC_nhpi_child <- + phi*E_nhpi_child
+dC_nhpi_adult <- + phi*E_nhpi_adult
+dC_white_child <- + phi*E_white_child
+dC_white_adult <- + phi*E_white_adult
+  
+  
+  
+  # Return list of gradients
+  list(c(dS_asian_child, dS_asian_adult, dS_black_child, dS_black_adult,
+         dS_latino_child, dS_latino_adult, dS_natam_child, dS_natam_adult,
+         dS_nhpi_child, dS_nhpi_adult, dS_white_child, dS_white_adult,
+         
+         dE_asian_child, dE_asian_adult, dE_black_child, dE_black_adult,
+         dE_latino_child, dE_latino_adult, dE_natam_child, dE_natam_adult,
+         dE_nhpi_child, dE_nhpi_adult, dE_white_child, dE_white_adult,
+         
+         dI_asian_child, dI_asian_adult, dI_black_child, dI_black_adult,
+         dI_latino_child, dI_latino_adult, dI_natam_child, dI_natam_adult,
+         dI_nhpi_child, dI_nhpi_adult, dI_white_child, dI_white_adult,
+         
+         dT_asian_child, dT_asian_adult, dT_black_child, dT_black_adult,
+         dT_latino_child, dT_latino_adult, dT_natam_child, dT_natam_adult, 
+         dT_nhpi_child, dT_nhpi_adult, dT_white_child, dT_white_adult,
+         
+         dR_asian_child, dR_asian_adult, dR_black_child, dR_black_adult,
+         dR_latino_child, dR_latino_adult, dR_natam_child, dR_natam_adult,
+         dR_nhpi_child, dR_nhpi_adult, dR_white_child, dR_white_adult,
+         
+         dD_asian_child, dD_asian_adult, dD_black_child, dD_black_adult,
+         dD_latino_child, dD_latino_adult, dD_natam_child, dD_natam_adult,
+         dD_nhpi_child, dD_nhpi_adult, dD_white_child, dD_white_adult,
+         
+         dC_asian_child, dC_asian_adult, dC_black_child, dC_black_adult,
+         dC_latino_child, dC_latino_adult, dC_natam_child, dC_natam_adult,
+         dC_nhpi_child, dC_nhpi_adult, dC_white_child, dC_white_adult
+         
+         ))
+}
+
+```
+
+
+
+## COVID-19 params
+```{r}
+# General parameters #
+PopT <- 12812508
+#12,812,508
+Pop_latino <-2337410
+Pop_latino_child <- Pop_latino*.2
+Pop_latino_adult <- Pop_latino*.8
+#2,337,410
+Pop_white <-7472751
+Pop_white_child <- Pop_white*.2
+Pop_white_adult <- Pop_white*.8
+#7,472,751
+Pop_black <- 1775612
+Pop_black_child <- Pop_black*.2
+Pop_black_adult <- Pop_black*.8
+#1,775,612
+Pop_natam <- 16561
+Pop_natam_child <- Pop_natam*.2
+Pop_natam_adult <- Pop_natam*.8
+#16,561
+Pop_asian <- 747280
+Pop_asian_child <- Pop_asian*.2
+Pop_asian_adult <- Pop_asian*.8
+#747,280
+Pop_nhpi <- 2959
+Pop_nhpi_child <- Pop_nhpi*.2
+Pop_nhpi_adult <- Pop_nhpi*.8
+#2,959
+
+names_var <- c("S_asian_child", "S_asian_adult", "S_black_child", "S_black_adult", 
+         "S_latino_child", "S_latino_adult", "S_natam_child", "S_natam_adult", 
+         "S_nhpi_child", "S_nhpi_adult", "S_white_child", "S_white_adult", 
+         
+         "E_asian_child", "E_asian_adult", "E_black_child", "E_black_adult", 
+         "E_latino_child", "E_latino_adult", "E_natam_child", "E_natam_adult", 
+         "E_nhpi_child", "E_nhpi_adult", "E_white_child", "E_white_adult", 
+         
+         "I_asian_child", "I_asian_adult", "I_black_child", "I_black_adult", 
+         "I_latino_child", "I_latino_adult", "I_natam_child", "I_natam_adult", 
+         "I_nhpi_child", "I_nhpi_adult", "I_white_child", "I_white_adult", 
+         
+         "T_asian_child", "T_asian_adult", "T_black_child", "T_black_adult", 
+         "T_latino_child", "T_latino_adult", "T_natam_child", "T_natam_adult", 
+         "T_nhpi_child", "T_nhpi_adult", "T_white_child", "T_white_adult", 
+         
+         "R_asian_child", "R_asian_adult", "R_black_child", "R_black_adult", 
+         "R_latino_child", "R_latino_adult", "R_natam_child", "R_natam_adult", 
+         "R_nhpi_child", "R_nhpi_adult", "R_white_child", "R_white_adult",
+         
+         "D_asian_child", "D_asian_adult", "D_black_child", "D_black_adult",
+         "D_latino_child", "D_latino_adult", "D_natam_child", "D_natam_adult", 
+         "D_nhpi_child", "D_nhpi_adult", "D_white_child", "D_white_adult",
+         
+         "C_asian_child", "C_asian_adult", "C_black_child", "C_black_adult",
+         "C_latino_child", "C_latino_adult", "C_natam_child", "C_natam_adult",
+         "C_nhpi_child", "C_nhpi_adult", "C_white_child", "C_white_adult"
+         
+         
+         )
+
+init <- rep(0,length(names_var))
+names(init) <- names_var
+init["S_asian_child"] <- 0.2*Pop_asian - 1
+init["I_asian_child"] <- 1
+init["S_asian_adult"] <- 0.8*Pop_asian - 1
+init["I_asian_adult"] <- 1
+
+init["S_black_child"] <- 0.2*Pop_black - 1
+init["I_black_child"] <- 1
+init["S_black_adult"] <- 0.8*Pop_black - 1
+init["I_black_adult"] <- 1
+
+init["S_latino_child"] <- 0.2*Pop_latino - 1
+init["I_latino_child"] <- 1
+init["S_latino_adult"] <- 0.8*Pop_latino - 1
+init["I_latino_adult"] <- 1
+
+init["S_natam_child"] <- 0.2*Pop_natam - 1
+init["I_natam_child"] <- 1
+init["S_natam_adult"] <- 0.8*Pop_natam - 1
+init["I_natam_adult"] <- 1
+
+init["S_nhpi_child"] <- 0.2*Pop_nhpi - 1
+init["I_nhpi_child"] <- 1
+init["S_nhpi_adult"] <- 0.8*Pop_nhpi - 1
+init["I_nhpi_adult"] <- 1
+
+init["S_white_child"] <- 0.2*Pop_white - 1
+init["I_white_child"] <- 1
+init["S_white_adult"] <- 0.8*Pop_white - 1
+init["I_white_adult"] <- 1
+
+parms <- c(beta = 0.3*10, epsilon = 1, phi = 1/2, gamma = 1/7, sigma = 0.006, omega = 1/180, 
+           nu_asian_child = 0, nu_black_child = 0, nu_latino_child = 0, nu_natam_child = 0, nu_nhpi_child = 0, nu_white_child = 0,
+           nu_asian_adult = 0, nu_black_adult = 0, nu_latino_adult = 0, nu_natam_adult = 0, nu_nhpi_adult = 0, nu_white_adult = 0,
+           zeta_asian_child = 0, zeta_black_child = 0, zeta_latino_child = 0, zeta_natam_child = 0, zeta_nhpi_child = 0, zeta_white_child = 0,
+           zeta_asian_adult = 0, zeta_black_adult = 0, zeta_latino_adult = 0, zeta_natam_adult = 0, zeta_nhpi_adult = 0, zeta_white_adult = 0,
+           tau_asian_i_child = 1, tau_black_i_child = 3, tau_latino_i_child = 3, tau_natam_i_child = 5, tau_nhpi_i_child = 5,
+           tau_asian_i_adult = 1, tau_black_i_adult = 3, tau_latino_i_adult = 3, tau_natam_i_adult = 5, tau_nhpi_i_adult = 5,
+           tau_asian_d_child = 1, tau_black_d_child = 3, tau_latino_d_child = 3, tau_natam_d_child = 5, tau_nhpi_d_child = 5,
+           tau_asian_d_adult = 1, tau_black_d_adult = 3, tau_latino_d_adult = 3, tau_natam_d_adult = 5, tau_nhpi_d_adult = 5
+           )
+
+```
+
+
+## Run model 1 
+```{r}
+times <- 1:1000 ## days
+
+out_seg <- ode(y=init, func = seg_model_adapted, times=times, parms = parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+```
+
+## Run model 2
+```{r}
+
+parms <- c(beta = 0.3*10, epsilon = 0, phi = 1/2, gamma = 1/7, sigma = 0.006, omega = 1/180, 
+           nu_asian_child = 0, nu_black_child = 0, nu_latino_child = 0, nu_natam_child = 0, nu_nhpi_child = 0, nu_white_child = 0,
+           nu_asian_adult = 0, nu_black_adult = 0, nu_latino_adult = 0, nu_natam_adult = 0, nu_nhpi_adult = 0, nu_white_adult = 0,
+           zeta_asian_child = 0, zeta_black_child = 0, zeta_latino_child = 0, zeta_natam_child = 0, zeta_nhpi_child = 0, zeta_white_child = 0,
+           zeta_asian_adult = 0, zeta_black_adult = 0, zeta_latino_adult = 0, zeta_natam_adult = 0, zeta_nhpi_adult = 0, zeta_white_adult = 0,
+           tau_asian_i_child = 1, tau_black_i_child = 3, tau_latino_i_child = 3, tau_natam_i_child = 5, tau_nhpi_i_child = 5,
+           tau_asian_i_adult = 1, tau_black_i_adult = 3, tau_latino_i_adult = 3, tau_natam_i_adult = 5, tau_nhpi_i_adult = 5,
+           tau_asian_d_child = 1, tau_black_d_child = 3, tau_latino_d_child = 3, tau_natam_d_child = 5, tau_nhpi_d_child = 5,
+           tau_asian_d_adult = 1, tau_black_d_adult = 3, tau_latino_d_adult = 3, tau_natam_d_adult = 5, tau_nhpi_d_adult = 5
+           )
+
+times <- 1:1000
+
+out_seg2 <- ode(y=init, func = seg_model_adapted, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+```
+
+
+
+
+
+
+## Plot model
+```{r}
+## Need to split population assignemnt by age
+## race_ethnicity == "asian" & age == "child"
+
+plot_out_seg <- out_seg %>%
+  separate(name, into = c("name", "race_ethnicity", "age"), sep = "_") %>%
+  mutate(Pop = case_when(
+    race_ethnicity == "asian" & age == "child" ~ Pop_asian_child,
+    race_ethnicity == "asian" & age == "adult" ~ Pop_asian_adult,
+    race_ethnicity == "black" & age == "child" ~ Pop_black_child,
+    race_ethnicity == "black" & age == "adult" ~ Pop_black_adult,
+    race_ethnicity == "latino" & age == "child" ~ Pop_latino_child,
+    race_ethnicity == "latino" & age == "adult" ~ Pop_latino_adult,
+    race_ethnicity == "natam" & age == "child" ~ Pop_natam_child,
+    race_ethnicity == "natam" & age == "adult" ~ Pop_natam_adult,
+    race_ethnicity == "nhpi" & age == "child" ~ Pop_nhpi_child,
+    race_ethnicity == "nhpi" & age == "adult" ~ Pop_nhpi_adult,
+    race_ethnicity == "white" & age == "child" ~ Pop_white_child,
+    race_ethnicity == "white" & age == "adult" ~ Pop_white_adult)) %>%
+  filter(name == "I" | name == "T" | name == "D") %>%
+  mutate(name = if_else(name == "D", "Deaths", "Infections")) %>%
+  group_by(race_ethnicity, time, Pop, name, age) %>%
+  summarise(value = sum(value)) %>%
+  ungroup() %>%
+  ggplot(aes(x = time/365, y = 100*value/Pop, color = age, group = age)) + 
+  geom_line() +
+  facet_wrap(~name) + 
+  scale_y_continuous("% infected", limits = c(0,60))
+plot_out_seg
+
+```
+
+```{r}
+
+plot_out_seg_2 <- out_seg2 %>%
+  separate(name, into = c("name", "race_ethnicity", "age"), sep = "_") %>%
+  mutate(Pop = case_when(
+    race_ethnicity == "asian" & age == "child" ~ Pop_asian_child,
+    race_ethnicity == "asian" & age == "adult" ~ Pop_asian_adult,
+    race_ethnicity == "black" & age == "child" ~ Pop_black_child,
+    race_ethnicity == "black" & age == "adult" ~ Pop_black_adult,
+    race_ethnicity == "latino" & age == "child" ~ Pop_latino_child,
+    race_ethnicity == "latino" & age == "adult" ~ Pop_latino_adult,
+    race_ethnicity == "natam" & age == "child" ~ Pop_natam_child,
+    race_ethnicity == "natam" & age == "adult" ~ Pop_natam_adult,
+    race_ethnicity == "nhpi" & age == "child" ~ Pop_nhpi_child,
+    race_ethnicity == "nhpi" & age == "adult" ~ Pop_nhpi_adult,
+    race_ethnicity == "white" & age == "child" ~ Pop_white_child,
+    race_ethnicity == "white" & age == "adult" ~ Pop_white_adult)) %>%
+  filter(name == "I" | name == "T" | name == "D") %>%
+  mutate(name = if_else(name == "D", "Deaths", "Infections")) %>%
+  group_by(race_ethnicity, time, Pop, name, age) %>%
+  summarise(value = sum(value)) %>%
+  ungroup() %>%
+  ggplot(aes(x = time/365, y = 100*value/Pop, color = age, group = age)) + 
+  geom_line() +
+  facet_wrap(~name) + 
+  scale_y_continuous("% infected", limits = c(0,60))
+plot_out_seg_2
+
+
+```
+
+
+--------------------------------------------------------------------------------
+
+SARS-COV2 Data Frame for reference 
+```{r}
+
+eps_vec <- seq(0,1, by = 0.1)
+sars_cov2_data_out <- NULL
+
+sars_cov2_parms <- c(beta = 0.427* 10, epsilon = 1, phi = 1/3, gamma = 1/5, sigma = 0.006, omega = 1/180, 
+           nu_asian_child = 0, nu_asian_adult = 0, nu_black_child = 0,nu_black_adult = 0, nu_latino_child = 0, 
+           nu_latino_adult = 0, nu_natam_child = 0, nu_natam_adult = 0, nu_nhpi_child = 0, nu_nhpi_adult = 0, nu_white_child = 0, nu_white_adult = 0,
+           
+           
+           zeta_asian_child = 0, zeta_black_child = 0, zeta_latino_child = 0, 
+           zeta_natam_child = 0, zeta_nhpi_child = 0, zeta_white_child = 0,zeta_asian_adult = 0, zeta_black_adult = 0, 
+           zeta_latino_adult = 0, zeta_natam_adult = 0, zeta_nhpi_adult = 0, zeta_white_adult = 0,
+           
+           
+           tau_asian_i_child = 1.2, tau_black_i_child = 3, tau_latino_i_child = 3, tau_natam_i_child = 5, tau_nhpi_i_child = 5,tau_asian_i_adult = 1.2, tau_black_i_adult = 3, tau_latino_i_adult = 3, tau_natam_i_adult = 5, tau_nhpi_i_adult = 5,
+           
+           tau_asian_d_child = 1, tau_black_d_child = 3, tau_latino_d_child = 3, tau_natam_d_child = 5, tau_nhpi_d_child = 5,
+           tau_asian_d_adult = 1, tau_black_d_adult = 3, tau_latino_d_adult = 3, tau_natam_d_adult = 5, tau_nhpi_d_adult = 5 )
+
+for (i in 1:11) { 
+  sars_cov2_parms$epsilon <- eps_vec[i]
+  
+  sars_cov2_parms <- unlist(as.list(sars_cov2_parms))
+  
+  sars_cov2_get_data_out <- ode(y=init, func = seg_model_adapted, times=times, parms = sars_cov2_parms) %>%
+    as.data.frame() %>%
+    pivot_longer(-time) %>%
+    mutate(run_epsilon = eps_vec[i])
+  
+  sars_cov2_data_out <- sars_cov2_data_out %>% rbind(sars_cov2_get_data_out)
+}
+
+```
+
+
+SARS-COV2 Infection Peak 
+```{r}
+sars_cov2_peak_cases <- sars_cov2_data_out %>% 
+  filter(name == "C_asian_child" | name == "C_asian_adult"|
+           name == "C_black_child" | name == "C_black_adult" | 
+           name == "C_latino_child" | name == "C_latino_adult" |
+           name == "C_natam_child" | name == "C_natam_adult" |
+           name == "C_nhpi_child" | name == "C_nhpi_adult" |
+           name == "C_white_child"| name == "C_white_adult") %>%
+  #filtering out to only have cumulative infection values 
+  separate(name, into = c("Compartment", "Race_Ethnicity", "age"),"_") %>%
+  filter(Compartment %in% c("I", "T", "D", "C")) %>%
+  #pivot_wider(names_from = "Compartment", values_from = "value") %>%
+  #mutate(Infections = I + `T`, Deaths = D) %>%
+  mutate(year = floor(time/365)) %>% #turning days into year
+  arrange(Race_Ethnicity) %>%
+  group_by(Race_Ethnicity,year, run_epsilon, age) %>%
+  arrange(time) %>%
+  mutate(yesterday = lag(value)) %>%
+  mutate(cases = value - yesterday ) %>%
+  na.omit(cases) %>%
+  ungroup() %>%
+  group_by(Race_Ethnicity, year, run_epsilon, age) %>%
+  reframe(max_cases = max(cases)) %>%
+  ungroup()
+
+```
+
+SARS-COV2 Infection Total 
+```{r}
+sars_cov2_inf_total_year <- sars_cov2_data_out %>% 
+  filter(name == "C_asian_child" | name == "C_asian_adult"|
+           name == "C_black_child" | name == "C_black_adult" | 
+           name == "C_latino_child" | name == "C_latino_adult" |
+           name == "C_natam_child" | name == "C_natam_adult" |
+           name == "C_nhpi_child" | name == "C_nhpi_adult" |
+           name == "C_white_child"| name == "C_white_adult")%>%
+  #filtering out to only have cumulative infection values 
+  separate(name, into = c("Compartment", "Race_Ethnicity", "age"),"_") %>%
+  filter(Compartment %in% c("I", "T", "D", "C")) %>%
+  #pivot_wider(names_from = "Compartment", values_from = "value") %>%
+  #mutate(Infections = I + `T`, Deaths = D) %>%
+  mutate(year = floor(time/365)) %>% #turning days into year
+  filter(time%% 365 == 0 | time == 1) %>%
+  arrange(Race_Ethnicity) %>%
+  group_by(year,Race_Ethnicity, run_epsilon, age) %>%
+  mutate(max_cases_year = max(value)) %>%
+  ungroup() %>%
+  group_by(Race_Ethnicity, run_epsilon) %>%
+  mutate(last_year = lag(max_cases_year)) %>%
+  ungroup() %>%
+  mutate(cases = max_cases_year - last_year)
+
+```
+
+
+SARS-COV2 Death Peak 
+```{r}
+sars_cov2_peak_deaths <- sars_cov2_data_out %>% 
+    filter(name == "C_asian_child" | name == "C_asian_adult"|
+           name == "C_black_child" | name == "C_black_adult" | 
+           name == "C_latino_child" | name == "C_latino_adult" |
+           name == "C_natam_child" | name == "C_natam_adult" |
+           name == "C_nhpi_child" | name == "C_nhpi_adult" |
+           name == "C_white_child"| name == "C_white_adult")%>%
+  #filtering out to only have deaths 
+  separate(name, into = c("Compartment", "Race_Ethnicity", "age"),"_") %>%
+  filter(Compartment %in% c("I", "T", "D", "C")) %>%
+  #pivot_wider(names_from = "Compartment", values_from = "value") %>%
+  #mutate(Infections = I + `T`, Deaths = D) %>%
+  mutate(year = floor(time/365)) %>% #turning days into year
+  arrange(Race_Ethnicity) %>%
+  group_by(Race_Ethnicity,year, run_epsilon, age) %>%
+  arrange(time) %>%
+  mutate(yesterday = lag(value)) %>%
+  mutate(deaths = value - yesterday ) %>%
+  na.omit(deaths) %>%
+  ungroup() %>%
+  group_by(Race_Ethnicity, year, run_epsilon, age) %>%
+  reframe(max_deaths = max(deaths)) %>%
+  ungroup()
+
+```
+
+
+SARS-COV2 Death Total 
+```{r}
+sars_cov2_deaths_total_year <- sars_cov2_data_out %>% 
+    filter(name == "C_asian_child" | name == "C_asian_adult"|
+           name == "C_black_child" | name == "C_black_adult" | 
+           name == "C_latino_child" | name == "C_latino_adult" |
+           name == "C_natam_child" | name == "C_natam_adult" |
+           name == "C_nhpi_child" | name == "C_nhpi_adult" |
+           name == "C_white_child"| name == "C_white_adult")%>%
+  #filtering out to only have deaths 
+  separate(name, into = c("Compartment", "Race_Ethnicity", "age"),"_") %>%
+  filter(Compartment %in% c("I", "T", "D", "C")) %>%
+  #pivot_wider(names_from = "Compartment", values_from = "value") %>%
+  #mutate(Infections = I + `T`, Deaths = D) %>%
+  mutate(year = floor(time/365)) %>% #turning days into year
+  filter(time%% 365 == 0 | time == 1) %>%
+  arrange(Race_Ethnicity) %>%
+  group_by(year,Race_Ethnicity, run_epsilon, age) %>%
+  mutate(max_deaths_year = max(value)) %>%
+  ungroup() %>%
+  group_by(Race_Ethnicity, run_epsilon, age) %>%
+  mutate(last_year = lag(max_deaths_year)) %>%
+  ungroup() %>%
+  mutate(deaths = max_deaths_year - last_year)
+
+
+```
+
+--------------------------------------------------------------------------------
+SARS-COV2 Plots 
+```{r}
+plot1 <- sars_cov2_inf_total_year %>%
+  ggplot() +
+  geom_line(aes(x = year, y = cases, color = Race_Ethnicity)) +
+  facet_wrap(~run_epsilon)
+plot1
+  
+  
+  
+```
+
+```{r}
+plot2 <- sars_cov2_peak_cases %>%
+  ggplot() +
+  geom_line(stat = 'identity',aes(x = year, y = max_cases, color = Race_Ethnicity)) +
+  facet_wrap(~run_epsilon)
+plot2  
+```
+
+```{r}
+plot3 <- sars_cov2_peak_deaths %>%
+  ggplot() +
+  geom_line(stat = 'identity',aes(x = year, y = max_deaths, color = Race_Ethnicity)) +
+  facet_wrap(~run_epsilon)
+plot3
+
+```
+
+```{r}
+plot4 <- sars_cov2_deaths_total_year %>%
+  ggplot() +
+  geom_line(aes(x = year, y = deaths, color = Race_Ethnicity)) +
+  facet_wrap(~run_epsilon)
+plot4
+
+```
+
+
+
+

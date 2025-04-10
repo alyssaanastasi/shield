@@ -1,0 +1,645 @@
+---
+title: "Analyses figures 4"
+author: "Sophie Larsen and Pamela P. Martinez"
+date: "`r format(Sys.time(), '%B %Y')`"
+  output:
+  pdf_document: default
+  html_document: default
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(deSolve)
+library(tidyverse)
+library(directlabels)
+library(cowplot)
+source("LarsenEtAl_functions.R")
+source("LarsenEtAl_SEIR_params.R")
+```
+
+
+## Average params
+
+```{r}
+paramsTableAll <- read_csv("../../Data/data_figures/paramsTable.csv")
+paramsTableStats <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Group, Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(Group = recode(Group, `1` = "S", `2` = "C"),
+         deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(deltaVm, digits = 2))
+
+paramsTableStatsNoGroup <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(deltaVm, digits = 2))
+
+paramsAvg <- paramsTableAll %>% ## group 2 is concave
+  select(Type = Group, SES:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Type, SES, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Type = recode(Type, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(MaxVac, digits = 2))
+
+paramsAvgNoSES <- paramsTableAll %>% ## group 2 is concave
+  select(Type = Group, MaxVac:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Type, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Type = recode(Type, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(MaxVac,digits = 2))
+```
+
+## Fig 3A: Vaccination rates with avg params per type and SES
+
+```{r}
+### Concave
+paramsCL <- paramsAvg %>% filter(Type == "C", SES == "L")
+paramsCH <- paramsAvg %>% filter(Type == "C", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=paramsCL$MaxVac, WVH=paramsCL$WVH, k=paramsCL$h)
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsCH$h)
+
+vaccOutC <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% 
+  mutate(Type = "C") %>% left_join(paramsAvg)
+
+### Sigmoidal
+paramsSL <- paramsAvg %>% filter(Type == "S", SES == "L")
+paramsSH <- paramsAvg %>% filter(Type == "S", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=paramsSL$MaxVac, WVH=paramsSL$WVH, k=paramsSL$h)
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsSH$h)
+
+vaccOutS <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S") %>% 
+  left_join(paramsAvg)
+```
+
+## Fig 4A: Daily vacc. rates with avg params per type and SES (expect for k) 
+
+```{r}
+### Concave
+paramsC_k <- paramsAvgNoSES %>% filter(Type == "C") %>% 
+  select(k = h) %>% as_vector() %>% round(digits = 2) 
+deltaVm <- paramsTableStatsNoGroup %>% filter(Stat == "avg") %>% select(deltaVm) %>% unlist %>% as.vector()
+deltaWh <- paramsTableStatsNoGroup %>% filter(Stat == "avg") %>% select(deltaWh) %>% unlist %>% as.vector()
+
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsCH$MaxVac - deltaVm, 
+                     WVH = paramsCH$WVH + deltaWh, k=paramsC_k)
+
+vaccOutC <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "C") 
+
+### Sigmoidal
+paramsS_k <- paramsAvgNoSES %>% filter(Type == "S") %>% 
+  select(k = h) %>% as_vector() %>% round(digits = 2) 
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsSH$MaxVac - deltaVm, 
+                     WVH= paramsSH$WVH + deltaWh, k=paramsS_k)
+
+vaccOutS <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S") 
+```
+
+
+## Fig 4BC: No vaccination
+
+```{r}
+times <- 1:420
+vaccL <- function(t){0}
+vaccH <- function(t){0}
+
+outNoVac <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(type = "No vaccination") %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumDeath = sum(value)) %>%ungroup()
+```
+
+## Figure 4B: Vacc at t = 0
+
+### Concave 
+
+```{r}
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsCH$MaxVac - deltaVm, 
+                     WVH= paramsCH$WVH + deltaWh, k=paramsC_k)
+
+outC_4B <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(type = "Concave") %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumDeath = sum(value)) %>% 
+  ungroup()
+```
+
+### Sigmoidal 
+
+```{r}
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsSH$MaxVac - deltaVm, 
+                     WVH= paramsSH$WVH + deltaWh, k=paramsS_k)
+
+outS_4B <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(type = "Sigmoidal") %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumDeath = sum(value)) %>% 
+  ungroup()
+```
+
+### Combine and save
+
+```{r}
+out4B <- rbind(outS_4B, outC_4B) %>% rbind(outNoVac)
+write_csv(out4B, "../../Data/data_figures/daily_vacc_t0_death.csv")
+
+plotOut4B <- out4B %>% 
+  ggplot(aes(x=time,y=CumDeath,col=type,linetype=SES)) + 
+  geom_line()
+```
+
+## Figure 4C: Vacc at t = 7 months
+
+### First 7 months without vacc.
+
+```{r}
+#### First run ####
+times <- 1:210
+vaccL <- function(t){0}
+vaccH <- function(t){0}
+
+outFirst <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+initSec <- outFirst %>% filter(time == max(time)) %>% 
+  pull(value, name) %>% round()
+```
+
+
+### Concave
+
+```{r}
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsCH$MaxVac - deltaVm, 
+                     WVH= paramsCH$WVH + deltaWh, k=paramsC_k)
+
+outC_4C <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Concave") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumDeath = sum(value)) %>% 
+  ungroup()
+```
+
+
+### Sigmoidal
+
+```{r}
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsSH$MaxVac - deltaVm, 
+                     WVH= paramsSH$WVH + deltaWh, k=paramsS_k)
+
+outS_4C <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Sigmoidal") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumDeath = sum(value)) %>% 
+  ungroup()
+```
+
+### Combine and save
+
+```{r}
+out4C <- rbind(outS_4C, outC_4C) %>% rbind(outNoVac)
+write_csv(out4C, "../../Data/data_figures/daily_vacc_t210_death.csv")
+
+plotOut4C <- out4C %>% 
+  ggplot(aes(x=time,y=CumDeath,col=type,linetype=SES)) + 
+  geom_line()
+```
+
+## Fig. 4D: Effect of vaccine on ections.
+
+### Case 0: no vaccination
+```{r}
+outC0_4D <- outNoVac %>% filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "No vaccination") %>% group_by(time, type,scenario) %>% 
+  summarise(TotalDeath = sum(CumDeath)) %>% ungroup() %>%
+  pivot_wider(names_from = time, 
+              values_from = TotalDeath, names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+```
+
+### Case 1: disparity - worst case
+
+```{r}
+#### Concave ####
+deltaVm <- paramsTableStatsNoGroup %>% filter(Stat == "q95") %>% select(deltaVm) %>% unlist %>% as.vector()
+deltaWh <- paramsTableStatsNoGroup %>% filter(Stat == "q95") %>% select(deltaWh) %>% unlist %>% as.vector()
+
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsCH$MaxVac - deltaVm, 
+                     WVH= paramsCH$WVH + deltaWh, k=paramsC_k)
+
+outC1C_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Concave") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Disparity: worst case") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+
+#### Sigmoidal ####
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsSH$MaxVac  - deltaVm, 
+                     WVH = paramsSH$WVH + deltaWh, k=paramsS_k)
+
+outC1S_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Sigmoidal") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Disparity: worst case") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+```
+
+### Case 2: disparity - average 
+```{r}
+outC2_4D <- out4C %>% 
+  filter(type != "No vaccination", time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Disparity: average") %>% group_by(time,type,scenario) %>% 
+  summarise(TotalDeath = sum(CumDeath)) %>% ungroup() %>%
+  pivot_wider(names_from = time, 
+              values_from = TotalDeath, names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+```
+
+### Case 3: equity - average 
+```{r}
+#### Concave ####
+paramsC3C <- paramsAvgNoSES %>% filter(Type == "C")
+vaccH <- vacc_weekly(Vmax = paramsC3C$MaxVac, WVH=paramsC3C$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsC3C$MaxVac, WVH=paramsC3C$WVH, k=paramsC_k)
+
+outC3C_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Concave") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Equity: average") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+
+#### Sigmoidal ####
+paramsC3S <- paramsAvgNoSES %>% filter(Type == "S")
+vaccH <- vacc_weekly(Vmax = paramsC3S$MaxVac, WVH=paramsC3S$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsC3S$MaxVac, WVH=paramsC3S$WVH, k=paramsS_k)
+
+outC3S_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Sigmoidal") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Equity: average") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+```
+
+### Case 4: equity - best case
+```{r}
+#### Concave ####
+vaccH <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+vaccL <- vacc_weekly(Vmax = paramsCH$MaxVac, WVH=paramsCH$WVH, k=paramsC_k)
+
+outC4C_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Concave") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Equity: best case") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+
+#### Sigmoidal ####
+vaccH <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+vaccL <- vacc_weekly(Vmax = paramsSH$MaxVac, WVH=paramsSH$WVH, k=paramsS_k)
+
+outC4S_4D <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Sigmoidal") %>% 
+  arrange(time) %>% filter(str_detect(name, "D")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+  filter(time %in% c(210, max(time))) %>% 
+  mutate(scenario = "Equity: best case") %>%
+  group_by(time,type,scenario) %>% summarise(TotalDeath = sum(value)) %>% 
+  ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+              names_prefix = "time_") %>%
+  mutate(DeathsSinceMonth7 = round(time_420 - time_210, digits = 0)) %>%
+  select(scenario,type,DeathsSinceMonth7)
+```
+
+### Combine and save
+```{r}
+out4D <- outC0_4D %>% rbind(outC1C_4D) %>% rbind(outC1S_4D) %>%
+  rbind(outC2_4D) %>% rbind(outC3C_4D) %>% rbind(outC3S_4D) %>% 
+  rbind(outC4C_4D) %>% rbind(outC4S_4D) %>% 
+  mutate(Ref = outC0_4D$DeathsSinceMonth7) %>% 
+  mutate(DeathsAdverted = round(100*(Ref - DeathsSinceMonth7)/Ref, digits = 0))
+
+write_csv(out4D, "../../Data/data_figures/outcomes_4D_death.csv")
+```
+
+## Fig. 4D: Grid parameter space 
+
+```{r}
+run_ode <- function() {
+  x <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+    rbind(outFirst) %>% arrange(time) %>% filter(str_detect(name, "D")) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>%
+    mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>% 
+    filter(time %in% c(210, max(time))) %>%
+    group_by(time) %>% summarise(TotalDeath = sum(value)) %>% 
+    ungroup() %>% pivot_wider(names_from = time, values_from = TotalDeath, 
+                names_prefix = "time_") %>%
+    mutate(deltaDeaths = round(time_420 - time_210, digits = 0)) %>%
+    mutate(ID = i) %>% select(ID, deltaDeaths)
+  return(x)
+}
+
+deltaVm <- paramsTableStatsNoGroup %>% filter(Stat == "q95") %>%
+  select(deltaVm) %>% unlist %>% as.vector()
+deltaWh <- paramsTableStatsNoGroup %>% filter(Stat == "q95") %>%
+  select(deltaWh) %>% unlist %>% as.vector()
+```
+
+### Concave
+
+#### Vm = best case, Wh = best case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E1 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H, Wh_L = Wh_H) %>% rowid_to_column("ID")
+
+out4E1 <- tibble(NULL)
+for(i in 1:nrow(par4E1)){ 
+  vaccH <- vacc_weekly(Vmax=par4E1$Vm_H[i], WVH=par4E1$Wh_H[i], k=paramsC_k)
+  vaccL <- vacc_weekly(Vmax=par4E1$Vm_L[i], WVH=par4E1$Wh_L[i], k=paramsC_k)
+  
+  out4E1T <- run_ode()
+  out4E1 <- rbind(out4E1, out4E1T)
+}
+
+out4E1 <- out4E1 %>% left_join(par4E1) %>% 
+  mutate(type = "Cocave", ScenarioVm = "best case", 
+         ScenarioWh = "best case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits=0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+#### Vm = best case, Wh = worst case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E2 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H, Wh_L = Wh_H + deltaWh) %>% rowid_to_column("ID")
+
+out4E2 <- tibble(NULL)
+for(i in 1:nrow(par4E2)){ 
+  vaccH <- vacc_weekly(Vmax=par4E2$Vm_H[i], WVH=par4E2$Wh_H[i], k=paramsC_k)
+  vaccL <- vacc_weekly(Vmax=par4E2$Vm_L[i], WVH=par4E2$Wh_L[i], k=paramsC_k)
+  
+  out4E2T <- run_ode()
+  out4E2 <- rbind(out4E2, out4E2T)
+}
+
+out4E2 <- out4E2 %>% left_join(par4E2) %>% 
+  mutate(type = "Cocave", ScenarioVm = "best case", 
+         ScenarioWh = "worst case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits=0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+#### Vm = worst case, Wh = best case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E3 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H - deltaVm, Wh_L = Wh_H) %>% rowid_to_column("ID")
+
+out4E3 <- tibble(NULL)
+for(i in 1:nrow(par4E3)){ 
+  vaccH <- vacc_weekly(Vmax=par4E3$Vm_H[i], WVH=par4E3$Wh_H[i], k=paramsC_k)
+  vaccL <- vacc_weekly(Vmax=par4E3$Vm_L[i], WVH=par4E3$Wh_L[i], k=paramsC_k)
+  
+  out4E3T <- run_ode()
+  out4E3 <- rbind(out4E3, out4E3T)
+}
+
+out4E3 <- out4E3 %>% left_join(par4E3) %>% 
+  mutate(type = "Cocave", ScenarioVm = "worst case", 
+         ScenarioWh = "best case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits = 0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+
+#### Vm = worst case, Wh = worst case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E4 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H - deltaVm, Wh_L = Wh_H + deltaWh) %>% rowid_to_column("ID")
+
+out4E4 <- tibble(NULL)
+for(i in 1:nrow(par4E4)){ 
+  vaccH <- vacc_weekly(Vmax=par4E4$Vm_H[i], WVH=par4E4$Wh_H[i], k=paramsC_k)
+  vaccL <- vacc_weekly(Vmax=par4E4$Vm_L[i], WVH=par4E4$Wh_L[i], k=paramsC_k)
+  
+  out4E4T <- run_ode()
+  out4E4 <- rbind(out4E4, out4E4T)
+}
+
+out4E4 <- out4E4 %>% left_join(par4E4) %>% 
+  mutate(type = "Cocave", ScenarioVm = "worst case", 
+         ScenarioWh = "worst case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits = 0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+
+### Sigmoidal
+
+#### Vm = best case, Wh = best case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E5 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H, Wh_L = Wh_H) %>% rowid_to_column("ID")
+
+out4E5 <- tibble(NULL)
+for(i in 1:nrow(par4E5)){ 
+  vaccH <- vacc_weekly(Vmax=par4E5$Vm_H[i], WVH=par4E5$Wh_H[i], k=paramsS_k)
+  vaccL <- vacc_weekly(Vmax=par4E5$Vm_L[i], WVH=par4E5$Wh_L[i], k=paramsS_k)
+  
+  out4E5T <- run_ode()
+  out4E5 <- rbind(out4E5, out4E5T)
+}
+
+out4E5 <- out4E5 %>% left_join(par4E5) %>% 
+  mutate(type = "Sigmoidal", ScenarioVm = "best case", 
+         ScenarioWh = "best case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits = 0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+#### Vm = best case, Wh = worst case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E6 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H, Wh_L = Wh_H + deltaWh) %>%
+  rowid_to_column("ID")
+
+out4E6 <- tibble(NULL)
+for(i in 1:nrow(par4E6)){ 
+  vaccH <- vacc_weekly(Vmax=par4E6$Vm_H[i], WVH=par4E6$Wh_H[i], k=paramsS_k)
+  vaccL <- vacc_weekly(Vmax=par4E6$Vm_L[i], WVH=par4E6$Wh_L[i], k=paramsS_k)
+  
+  out4E6T <- run_ode()
+  out4E6 <- rbind(out4E6, out4E6T)
+}
+
+out4E6 <- out4E6 %>% left_join(par4E6) %>% 
+  mutate(type = "Sigmoidal", ScenarioVm = "best case", 
+         ScenarioWh = "worst case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits=0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+#### Vm = worst case, Wh = best case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E7 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H - deltaVm, Wh_L = Wh_H) %>%
+  rowid_to_column("ID")
+
+out4E7 <- tibble(NULL)
+for(i in 1:nrow(par4E7)){ 
+  vaccH <- vacc_weekly(Vmax=par4E7$Vm_H[i], WVH=par4E7$Wh_H[i], k=paramsS_k)
+  vaccL <- vacc_weekly(Vmax=par4E7$Vm_L[i], WVH=par4E7$Wh_L[i], k=paramsS_k)
+  
+  out4E7T <- run_ode()
+  out4E7 <- rbind(out4E7, out4E7T)
+}
+
+out4E7 <- out4E7 %>% left_join(par4E7) %>% 
+  mutate(type = "Sigmoidal", ScenarioVm = "worst case", 
+         ScenarioWh = "best case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits = 0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+
+#### Vm = worst case, Wh = worst case 
+
+```{r, warning=FALSE, message=FALSE}
+#### Concave ####
+par4E8 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1)) %>%
+  mutate(Vm_L = Vm_H - deltaVm, Wh_L = Wh_H + deltaWh) %>%
+  rowid_to_column("ID")
+
+out4E8 <- tibble(NULL)
+for(i in 1:nrow(par4E8)){ 
+  vaccH <- vacc_weekly(Vmax=par4E8$Vm_H[i], WVH=par4E8$Wh_H[i], k=paramsS_k)
+  vaccL <- vacc_weekly(Vmax=par4E8$Vm_L[i], WVH=par4E8$Wh_L[i], k=paramsS_k)
+  
+  out4E8T <- run_ode()
+  out4E8 <- rbind(out4E8, out4E8T)
+}
+
+out4E8 <- out4E8 %>% left_join(par4E8) %>% 
+  mutate(type = "Sigmoidal", ScenarioVm = "worst case", 
+         ScenarioWh = "worst case", Ref = outC0_4D$DeathsSinceMonth7, 
+         PercDeathAdverted = round(100*(Ref - deltaDeaths)/Ref, digits = 0)) %>%
+  select(type, ScenarioVm, ScenarioWh, Vm_H, Wh_H, PercDeathAdverted)
+```
+
+### Combine and save
+```{r}
+out4E <- out4E1 %>% rbind(out4E2) %>% rbind(out4E3) %>%
+  rbind(out4E4) %>% rbind(out4E5) %>% rbind(out4E6) %>% 
+  rbind(out4E7) %>% rbind(out4E8) 
+
+write_csv(out4E, "../../Data/data_figures/outcomes_4E_death.csv")
+```
+

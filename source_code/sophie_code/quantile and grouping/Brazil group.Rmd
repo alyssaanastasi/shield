@@ -1,0 +1,413 @@
+---
+title: "Brazil group"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/sophi/Box/Vaccine_inequity/Data/final/Brazil/Finished sets")) 
+library(tidyverse)
+library(viridis)
+library(lubridate)
+library(dineq)
+library(cowplot)
+library(readxl)
+library(MetBrewer)
+library(oce)
+```
+
+
+## load and aggregate the data
+
+vaccines started around jan 17-19
+
+https://en.wikipedia.org/wiki/COVID-19_vaccination_in_Brazil
+```{r}
+
+## have to filter out the birth date error - see brazil test file in the regional data, and messages with Tom
+
+
+
+AC <- read_csv("BR_Set_1_AC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup()
+AL <- read_csv("BR_Set_1_AL.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AC)
+AM <- read_csv("BR_Set_1_AM.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AL)
+AP <- read_csv("BR_Set_1_AP_codetest.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AM)
+BA <- read_csv("BR_Set_1_BA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AP)
+CE <- read_csv("BR_Set_1_CE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(BA)
+DF <- read_csv("BR_Set_1_DF.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(CE)
+ES <- read_csv("BR_Set_1_ES.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(DF)
+GO <- read_csv("BR_Set_1_GO.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(ES)
+MA <- read_csv("BR_Set_1_MA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(GO)
+MG <- read_csv("BR_Set_1_MG.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MA)
+MS <- read_csv("BR_Set_1_MS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MG)
+MT <- read_csv("BR_Set_1_MT.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MS)
+PA <- read_csv("BR_Set_1_PA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MT)
+PB <- read_csv("BR_Set_1_PB.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PA)
+PE <- read_csv("BR_Set_1_PE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PB)
+PI <- read_csv("BR_Set_1_PI.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PE)
+PR <- read_csv("BR_Set_1_PR.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PI)
+RN <- read_csv("BR_Set_1_RN.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PR)
+RJ <- read_csv("BR_Set_1_RJ.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RN)
+RO <- read_csv("BR_Set_1_RO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RJ)
+RS <- read_csv("BR_Set_1_RS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RO)
+SC <- read_csv("BR_Set_1_SC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RS)
+SE <- read_csv("BR_Set_1_SE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SC)
+SP <- read_csv("BR_Set_1_SP.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SE)
+TO <- read_csv("BR_Set_1_TO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SP)
+
+### load SES data
+
+Set2 <- read_csv("BR_Set_2.csv")
+
+test <- Set2 %>% filter(code == 510706)
+
+```
+
+## filter for partial dose, and format to week
+
+```{r}
+
+Set1 <- TO %>%
+  filter(dose == "partial")
+
+  start <- c("2021-01-17")
+
+Set1 <- Set1 %>%
+  mutate(week = difftime(date, as.Date(start, "%Y-%m-%d"), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week)) %>%
+  group_by(code, week, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(week) %>%
+  group_by(code, state) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup()
+
+```
+
+## testplot
+```{r}
+plot <- Set1 %>% ggplot() + geom_line(aes(x = week, y = vcum, group = code))
+plot
+
+
+```
+
+```{r}
+plot <- Set1 %>% group_by(code) %>% filter(max(vcum) < 10000000) %>% ungroup() %>% ggplot() + geom_line(aes(x = week, y = vcum, group = code))
+plot
+
+```
+
+## join SES and vaccine
+```{r}
+
+## need population
+pop <- read_excel("popclean.xlsx")
+
+Set2 <- Set2[c(1,3:6)] %>%
+  rename(state = stateac) %>%
+  filter(measure != "population") %>%
+  rename(name = location)
+
+Brazil <- inner_join(Set1,Set2, by = c("code", "state")) %>%
+  mutate(code = as.character(code))
+Brazil <- inner_join(Brazil,pop, by = c("name", "state"))
+
+Brazil <- Brazil %>% 
+  mutate(pop = as.numeric(pop),vperc = 100*vcum/pop) %>% filter(!is.na(vperc), !is.na(value))
+
+```
+
+## test plot
+```{r}
+
+plot <- Brazil  %>% filter(measure == "income5") %>% 
+  group_by(code) %>%
+  mutate(m = max(vperc, na.rm = T)) %>%
+  ungroup() %>%
+##  filter(m>350) %>%
+  ggplot() + geom_line(aes(x = week, y = vperc, group = code))
+plot
+
+## code 240970
+
+```
+## test
+
+```{r}
+test1 <- Brazil %>% filter(week == 1) %>% select(code) %>% distinct()
+
+test10 <- Brazil %>% filter(week == 10) %>% select(code) %>% distinct()
+
+test20 <- Brazil %>% filter(week == 20) %>% select(code) %>% distinct()
+
+test25 <- Brazil %>% filter(week == 25) %>% select(code) %>% distinct()
+
+
+## observation: not every code reports every week
+```
+
+
+## bin SES
+
+```{r}
+## first, need number of locations for each state. we have all 26 states but need to filter the low resolution ones. 
+
+distinctBr <- Brazil %>%
+  filter(measure == "income5") %>%
+  mutate(measure = NULL) %>%
+  select(code, state) %>%
+  distinct() %>%
+  count(state) %>%
+  filter(n>= 12)
+
+distinct12 <- distinctBr %>%
+  filter(n>=12 & n<=20)
+distinct20 <- distinctBr %>%
+  filter(n>20 & n<= 99)
+distinct100 <- distinctBr %>% 
+  filter(n>=100)
+
+## income5 is hardcore poverty, 12-20 locations
+Brazil12 <- inner_join(Brazil,distinct12)[c("code", "measure", "value", "state")] %>%
+  distinct() %>%
+  filter(measure == "income5") %>%
+  group_by(state) %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("H",2,"L"), na.rm = T)) %>%
+ungroup()
+
+  Brazil12$nbin[Brazil12$nbin == 1] <- "H"
+  Brazil12$nbin[Brazil12$nbin == 3] <- "L"
+
+## income5 is hardcore poverty, 21-99 locations
+Brazil20 <- inner_join(Brazil,distinct20)[c("code", "measure", "value", "state")] %>%
+  distinct() %>%
+  filter(measure == "income5") %>%
+  group_by(state) %>%
+  mutate(nbin = ntile(x = value, n = 5)) %>%
+  mutate(cbin = cut_interval(value, n = 5, labels = c("H",2,3,4,"L"), na.rm = T)) %>%
+ungroup()
+
+  Brazil20$nbin[Brazil20$nbin == 1] <- "H"
+  Brazil20$nbin[Brazil20$nbin == 5] <- "L"
+
+## income5 is hardcore poverty, >100 locations
+Brazil100 <- inner_join(Brazil,distinct100)[c("code", "measure", "value", "state")] %>%
+  distinct() %>%
+  filter(measure == "income5") %>%
+  group_by(state) %>%
+  mutate(nbin = ntile(x= value, n = 10)) %>%
+  mutate(cbin = cut_interval(value, n = 10, labels = c("H",2,3,4,5,6,7,8,9,"L"), na.rm = T)) %>%
+ungroup()
+
+  Brazil100$nbin[Brazil100$nbin == 1] <- "H"
+  Brazil100$nbin[Brazil100$nbin == 10] <- "L"
+  
+  
+  sesBrazil <- rbind(Brazil100, Brazil20) %>% rbind(Brazil12)
+  
+Brazil <- Brazil %>%
+  left_join(sesBrazil, by = c("code", "measure", "value", "state")) %>%
+  group_by(state, code) %>%
+  filter(!is.na(value), !all(is.na(vperc))) %>%
+  ungroup() %>% 
+  add_column(country = "Brazil")
+```
+
+## test
+```{r}
+test <- Brazil %>% filter(state == "AM")
+```
+
+### pivot
+```{r}
+Brazil <- Brazil[c("country","state", "code", "week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue") %>%
+  filter(measure == "income5")
+```
+
+### save file for supplement plot
+```{r}
+make <- Brazil %>% filter(bins == "nbin")
+
+write.csv(Brazil,"C:/Users/sophi/Box/Vaccine_inequity/Data/final/locBr.csv", row.names = FALSE)
+
+```
+
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+Brazil <- Brazil %>%
+  group_by(country, state, week, measure, bins, binvalue) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+
+
+## make csv
+```{r}
+makeCSV <- Brazil[c(1:7)] %>%
+  filter(binvalue == "L" | binvalue == "H") %>%
+  filter(bins == "nbin") %>%
+  rename(bin = binvalue, value = avg) %>%
+  mutate(bins = NULL) %>%
+  add_column(continent = "South America") %>%
+  left_join(distinctBr)
+
+### clean the dips in the data
+makeCSV <- makeCSV %>%
+  group_by(country, state, measure, bin) %>%
+  mutate(value = despike(
+  value,
+  reference = "median",
+  n = 0.2,
+  k = 15,
+  min = NA,
+  max = NA,
+  replace = "NA")
+)
+
+write.csv(makeCSV,"C:/Users/sophi/Box/Vaccine_inequity/Data/final/Brazil.csv", row.names = FALSE)
+```
+## test
+```{r}
+plot <- makeCSV %>% filter(state == "AM") %>% ggplot() + geom_line(aes(x = week, y = value, group = bin)) + facet_wrap(~state)
+plot
+
+test <- makeCSV %>% filter(state == "AL")
+```

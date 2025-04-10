@@ -1,0 +1,275 @@
+---
+title: "Analyses of extreme vaccine trends (fig 4)"
+author: "Sophie Larsen and Pamela P. Martinez"
+date: "`r format(Sys.time(), '%B %Y')`"
+  output:
+  pdf_document: default
+  html_document: default
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(deSolve)
+library(tidyverse)
+library(directlabels)
+library(cowplot)
+source("LarsenEtAl_functions.R")
+source("LarsenEtAl_SEIR_params.R")
+```
+
+
+## Average params
+
+```{r}
+paramsTableAll <- read_csv("../../Data/data_figures/paramsTable.csv")
+paramsTableStats <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Group, Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(Group = recode(Group, `1` = "S", `2` = "C"),
+         deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(deltaVm, digits = 2))
+
+paramsTableStatsNoGroup <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(deltaVm, digits = 2))
+
+paramsAvg <- paramsTableAll %>% ## group 2 is concave
+  select(Type = Group, SES:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Type, SES, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Type = recode(Type, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(MaxVac, digits = 2))
+
+paramsAvgNoSES <- paramsTableAll %>% ## group 2 is concave
+  select(Type = Group, MaxVac:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Type, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Type = recode(Type, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(MaxVac,digits = 2))
+```
+
+
+
+## Figure 4C: Vacc at t = 7 months
+
+### First 7 months without vacc.
+
+```{r}
+#### First run ####
+times <- 1:210
+vaccL <- function(t){0}
+vaccH <- function(t){0}
+
+outFirst <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+initSec <- outFirst %>% filter(time == max(time)) %>% 
+  pull(value, name) %>% round()
+```
+
+
+### Concave
+
+```{r}
+vaccH <- vacc_weekly(Vmax = .50, WVH=5, k=1.7)
+vaccL <- vacc_weekly(Vmax = .50, 
+                     WVH= 5, k=1.7)
+
+outC_waning <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Concave") %>% 
+  arrange(time) %>% filter(str_detect(name, "Inf")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumInf = sum(value)) %>% 
+  ungroup()
+```
+
+
+### Sigmoidal
+
+```{r}
+vaccH <- vacc_weekly(Vmax = .50, WVH=5, k=3.14)
+vaccL <- vacc_weekly(Vmax = .50, 
+                     WVH= 5, k=3.14)
+
+outS_waning <- ode(y=initSec, func = seir, times=0:210, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  filter(time > 0) %>% mutate(time = time+max(outFirst$time)) %>%
+  rbind(outFirst) %>% mutate(type = "Sigmoidal") %>% 
+  arrange(time) %>% filter(str_detect(name, "Inf")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumInf = sum(value)) %>% 
+  ungroup()
+```
+
+## Fig 4BC: No vaccination
+
+```{r}
+times <- 1:420
+vaccL <- function(t){0}
+vaccH <- function(t){0}
+
+outNoVac <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(type = "No vaccination") %>% filter(str_detect(name, "Inf")) %>% 
+  separate(name, c("Variable","SES"), sep = "_") %>%
+  mutate(SES = str_replace_all(SES, "[:digit:]", "")) %>%
+  group_by(time, type, SES) %>% summarise(CumInf = sum(value)) %>%ungroup()
+```
+
+### Model trends over time (Wh = 5, Vm = 50)
+
+```{r}
+out4_waning <- rbind(outS_waning, outC_waning) %>% rbind(outNoVac)
+write_csv(out4_waning, "../../Data/data_figures/daily_vacc_waning.csv")
+
+plotOut_waning <- out4_waning %>% 
+  group_by(type, time) %>% 
+  summarise(CumInf = sum(CumInf)) %>%
+  ungroup() %>%
+  filter(time>200) %>%
+  ggplot(aes(x=time,y=CumInf,col=type)) + 
+  geom_line()
+plotOut_waning
+```
+
+## Fig Supp: Extreme trends
+
+### Wh = 5, Vm = 50
+```{r}
+### Concave
+paramsCL <- paramsAvg %>% filter(Type == "C", SES == "L")
+paramsCH <- paramsAvg %>% filter(Type == "C", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=0.5, WVH=5, k=1.7)
+vaccH <- vacc_weekly(Vmax = 0.5, WVH=5, k=1.7)
+
+vaccOutCV50W5 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% 
+  mutate(Type = "C") %>%  mutate(Wh = 5, Vm = 50) 
+
+### Sigmoidal
+paramsSL <- paramsAvg %>% filter(Type == "S", SES == "L")
+paramsSH <- paramsAvg %>% filter(Type == "S", SES == "H")
+
+vaccL <- vacc_weekly(Vmax = 0.5, WVH=5, k=3.14)
+vaccH <- vacc_weekly(Vmax = 0.5, WVH=5, k=3.14)
+
+vaccOutSV50W5 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S") %>%  mutate(Wh = 5, Vm = 50)
+
+```
+
+
+### Wh = 5, Vm = 100
+```{r}
+### Concave
+paramsCL <- paramsAvg %>% filter(Type == "C", SES == "L")
+paramsCH <- paramsAvg %>% filter(Type == "C", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=1, WVH=5, k=1.7)
+vaccH <- vacc_weekly(Vmax = 1, WVH=5, k=1.7)
+
+vaccOutCV100W5 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% 
+  mutate(Type = "C") %>%  mutate(Wh = 5, Vm = 100) 
+
+### Sigmoidal
+paramsSL <- paramsAvg %>% filter(Type == "S", SES == "L")
+paramsSH <- paramsAvg %>% filter(Type == "S", SES == "H")
+
+vaccL <- vacc_weekly(Vmax = 1, WVH=5, k=3.14)
+vaccH <- vacc_weekly(Vmax = 1, WVH=5, k=3.14)
+
+vaccOutSV100W5 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S")%>% mutate(Wh = 5, Vm = 100)
+
+```
+
+### Wh = 30, Vm = 100
+```{r}
+### Concave
+paramsCL <- paramsAvg %>% filter(Type == "C", SES == "L")
+paramsCH <- paramsAvg %>% filter(Type == "C", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=1, WVH=30, k=1.7)
+vaccH <- vacc_weekly(Vmax = 1, WVH=30, k=1.7)
+
+vaccOutCV100W30 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% 
+  mutate(Type = "C") %>% mutate(Wh = 30, Vm = 100) 
+
+### Sigmoidal
+paramsSL <- paramsAvg %>% filter(Type == "S", SES == "L")
+paramsSH <- paramsAvg %>% filter(Type == "S", SES == "H")
+
+vaccL <- vacc_weekly(Vmax = 1, WVH=30, k=3.14)
+vaccH <- vacc_weekly(Vmax = 1, WVH=30, k=3.14)
+
+vaccOutSV100W30 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S") %>% mutate(Wh = 30, Vm = 100)
+
+```
+
+
+### Wh = 30, Vm = 50
+```{r}
+### Concave
+paramsCL <- paramsAvg %>% filter(Type == "C", SES == "L")
+paramsCH <- paramsAvg %>% filter(Type == "C", SES == "H")
+
+vaccL <- vacc_weekly(Vmax=0.5, WVH=30, k=1.7)
+vaccH <- vacc_weekly(Vmax = 0.5, WVH=30, k=1.7)
+
+vaccOutCV50W30 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% 
+  mutate(Type = "C") %>% mutate(Wh = 30, Vm = 50) 
+
+### Sigmoidal
+paramsSL <- paramsAvg %>% filter(Type == "S", SES == "L")
+paramsSH <- paramsAvg %>% filter(Type == "S", SES == "H")
+
+vaccL <- vacc_weekly(Vmax = 0.5, WVH=30, k=3.14)
+vaccH <- vacc_weekly(Vmax = 0.5, WVH=30, k=3.14)
+
+vaccOutSV50W30 <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L, names_to = "SES") %>% mutate(Type = "S") %>% mutate(Wh = 30, Vm = 50)
+
+```
+
+
+```{r}
+trends_full <- rbind(vaccOutSV50W5, vaccOutSV100W30) %>% 
+  rbind(vaccOutSV100W5) %>% rbind(vaccOutSV50W30) %>%
+  rbind(vaccOutCV50W30) %>% rbind(vaccOutCV100W30) %>%
+  rbind(vaccOutCV100W5) %>% rbind(vaccOutCV50W5)
+```
+
+```{r}
+write_csv(trends_full, "../../Data/data_figures/extremetrends.csv")
+```
+
+

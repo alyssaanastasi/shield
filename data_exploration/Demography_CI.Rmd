@@ -1,0 +1,138 @@
+---
+title: "Demography_CI"
+author: "Alyssa Anastasi"
+date: "2025-02-27"
+output: html_document
+---
+
+# R Setup
+
+```{r setup, include = FALSE}
+#### GENERAL ######
+library(tidyverse)
+library(readxl) ## read excel files
+library(broom)
+library(rlang) #convert string to variable
+
+
+##### STATISTICS ####
+library(Hmisc)
+library(oce)
+library(zoo)
+library(spatstat.utils)
+library(Metrics)
+library(skimr)
+library(ggpubr)
+library(reshape2)
+library(tigris)
+library(lubridate)
+library(sf)
+library(nnet)
+
+
+######## PALETTES ######
+library(RColorBrewer) 
+library(wesanderson)
+library(ghibli)
+library(NatParksPalettes)
+library(viridis)
+library(MetBrewer)
+library(PNWColors)
+
+####### PLOT MACHINERY ######
+library(directlabels)
+library(cowplot)
+library(scales)
+library(patchwork)
+library(ggh4x)
+library(ggrepel)
+library(svglite)
+
+##### MAKE TABLE IN LATEX #####
+library(gt)
+```
+
+
+# Load In Data & Clean 
+```{r, include=FALSE}
+survey_cleaned <- read_csv("data/cleaned_Wave1.csv")
+demographic_variable <- data.frame(demographic = c("self_race", "gender", "self_political_affiliation", "self_income", "self_education", "respondent_age", "self_employment", "self_political_ideology", "self_political_candidate_2020"))
+
+df_filtered <- survey_cleaned
+df_filtered <- df_filtered  %>%
+      mutate(age_cat = case_when(
+        child_age == "5 and under" ~ "0-5",
+        child_age == "6-18 years" ~ "6-18",
+        child_age == "No child age given" ~ "Adult" # filter this, we don't want this
+      ))
+
+# df_child <- df_filtered  %>%
+  #    filter(age_cat != "Adult"& question == qstn_child & response == "Yes") 
+# df_adult <- df_filtered  %>%
+  #    filter(question == qstn_adult & response == "Yes") %>%
+   #   mutate(age_cat = "Adult")
+#df_filtered <- bind_rows(df_adult, df_child) 
+```
+# Demography Confidence Intervals
+
+```{r}
+results <- data.frame(
+  demographic = character(),
+  category = character(),
+  proportion = numeric(),
+  lower_CI = numeric(),
+  upper_CI = numeric(),
+  sample_size  = numeric()
+)
+for (d in seq_len(nrow(demographic_variable))){
+  col <- demographic_variable$demographic[d]
+  d_options <- unique(df_filtered[col])
+  for (i in seq_len(nrow(d_options))){
+    curr_demo <- d_options[[i, col]]
+    response_counts <- table(survey_cleaned[col])
+    total <- sum(response_counts)
+    curr_count <- response_counts[curr_demo]
+    
+    if (!is.na(curr_count)){
+      proportion <- prop.test(curr_count, total)
+      results <- rbind(results, data.frame(
+      demographic = col,
+      category = curr_demo,
+      proportion = (proportion$estimate)*100,
+      lower_CI = (proportion$conf.int[1])*100,
+      upper_CI = (proportion$conf.int[2])*100,
+      sample_size = curr_count ))
+    } else {
+      results <- rbind(results, data.frame(
+      demographic = col,
+      category = curr_demo,
+      proportion = NA,
+      lower_CI = NA,
+      upper_CI = NA,
+      sample_size = NA ))
+    }
+  }
+  
+  }
+
+```
+
+### Make Table
+```{r}
+results <- results %>% filter(!is.na(category))
+
+results_table <- gt::gt(results, rowname_col = "category", groupname_col = "demographic") |>
+  fmt_number(decimals = 2) |>
+  tab_header(
+    title = "SHIELD Survey Demography",
+    subtitle = "Wave 1",
+  ) |>
+  tab_options(
+    table.width = 600 )
+
+results_table |> gtsave("demography_figures/demographic_table.pdf")
+```
+
+
+
+# Demography by Age Group

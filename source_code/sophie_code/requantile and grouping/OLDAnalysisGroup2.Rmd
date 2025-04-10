@@ -1,0 +1,1046 @@
+---
+title: "Group 2 Analysis: 20-100 locations"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/sophi/Box/Vaccine_inequity/updated data")) 
+library(tidyverse)
+library(viridis)
+library(lubridate)
+library(dineq)
+library(cowplot)
+library(readxl)
+library(MetBrewer)
+```
+
+## load the data
+```{r "load data"}
+## load vaccine
+dataPR1 <- read_csv("PR_Set_1.csv") ## no dose information
+dataBA1 <- read_csv("BA_Set_1.csv") %>%
+  filter(dose == "partial")
+dataEc1 <- read_csv("Ec_Set_1.csv") ## no dose information
+
+dataUS1 <- read_csv("US_Set_1.csv") %>%
+  filter(dose == "partial")
+
+dataFr1 <- read_csv("FR_Set_1.csv") %>%
+  filter(vaccine == "total", dose == "partial")
+
+
+## load SES
+dataFr2 <- read_csv("Fr_Set_2.csv")
+
+dataUS2 <- read_csv("US_Set_2.csv")
+
+dataPR2 <- read_csv("PR_Set_2.csv") %>%
+  filter(measure == "income5" | measure == "income6") ## load median household income and persons in poverty, pct
+dataEc2 <- read_csv("Ec_Set_2.csv") %>%
+  filter(pooverty_value == "Estimation") %>% ## load poverty estimation of pct in poverty
+  rename(measure = "pooverty_value")
+
+## rename to appropriate measure designation
+dataEc2$measure[dataEc2$measure == "Estimation"] <- "income6"
+
+dataBA2 <- read_csv("BA_Set_2.csv") %>%
+  filter(measure == "income7") ## worldpop income index
+
+## load distinct counts
+
+datadistinct <- read_csv("distinct.csv")
+
+```
+
+## PUERTO RICO
+
+### date to week
+This code counts the weeks since vaccination started. PR started vaccination earlier than the US according to the data, whereas the internet says they started the 15th. I will count the data as start date. The code also aggregates the data by week
+
+``` {r "PR aggregate week and vaccine"}
+
+dataPR1 <- dataPR1 %>%
+  mutate(week = difftime(date, min(date, na.rm = T), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week)) %>%
+  group_by(location, week, pop, resolution) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() 
+```
+
+### cumsum
+takes the cumulative sum of the vaccination data
+
+```{r "PR cumulative computation"}
+
+dataPR1 <- dataPR1 %>%
+  arrange(week) %>%
+  group_by(location) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup()
+
+```
+
+### percentage
+takes the percentage of the vaccination data
+```{r "PR percentage"}
+dataPR1 <- dataPR1 %>%
+  mutate(vperc = (vcum/pop)*100)
+```
+
+### get list of distinct locations
+this code grabs a list of the distinct locations for which we have SES data AND vaccine data
+```{r}
+distinctPR <- dataPR2 %>%
+  filter(measure == "income5" | measure == "income6") %>%
+  inner_join(dataPR1) %>%
+  filter(!is.na(vperc), !is.na(value)) %>%
+  ## no dose data
+  select(location, measure) %>%
+  distinct()
+```
+
+### merge distinct with SES
+this code pulls out of the SES data only those locations for which we also have vaccine data
+```{r}
+dataPR <- inner_join(dataPR2, distinctPR, by = c("location", "measure"))
+```
+
+### bin SES data
+This code takes the SES data and cuts it into bins using cut_interval and ntile
+```{r}
+
+## grab the PR income data
+dataPRinc <- dataPR %>%
+  filter(measure == "income5") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("L","M", "H"), na.rm = T))
+
+  dataPRinc$nbin[dataPRinc$nbin == 1] <- "L"
+  dataPRinc$nbin[dataPRinc$nbin == 2] <- "M"
+  dataPRinc$nbin[dataPRinc$nbin == 3] <- "H"
+  
+## grab the PR poverty data
+dataPRpov <- dataPR %>%
+  filter(measure == "income6") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("H","M", "L"), na.rm = T))
+
+  dataPRpov$nbin[dataPRpov$nbin == 1] <- "H"
+  dataPRpov$nbin[dataPRpov$nbin == 2] <- "M"
+  dataPRpov$nbin[dataPRpov$nbin == 3] <- "L"
+  
+  ## bind them back together
+  
+  dataPR <- rbind(dataPRpov, dataPRinc)
+```
+
+### merge vaccine with SES
+merges the SES data with bins, to the vaccine data
+```{r}
+dataPR <- inner_join(dataPR1, dataPR, by = c("location")) %>%
+  filter(!is.na(value), !is.na(vperc))
+```
+
+### pivot
+pivoting the SES bins into a column, and filter out M bin
+```{r}
+dataPR <- dataPR[c("country", "location","week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue") 
+```
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+gridPR <- dataPR %>%
+  group_by(country, week, measure, bins, binvalue) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+## ECUADOR
+### date to week
+I cannot find when Ecuador started vaccinating, so I will use the minimum date in the data.
+```{r}
+
+dataEc1 <- dataEc1 %>%
+  mutate(date = gsub("/21","/2021", date)) %>%
+  mutate(date = as.Date(date, "%d/%m/%Y")) %>%
+  mutate(week = difftime(date, min(date, na.rm = T), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week))
+
+dataEc1 <- dataEc1 %>%
+  arrange(date)
+```
+
+### aggregate
+```{r}
+
+## this code checks the maximum date for a location and week, then pulls that as the vcum for that week
+dataEc1 <- dataEc1 %>%
+  group_by(country, province, week, population) %>%
+  filter(date == max(date, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(date = NULL)
+
+```
+
+### choose provinces as the location from vaccine data, and add resolution
+```{r}
+dataEc1 <- dataEc1 %>%
+  mutate(location = NULL)  %>%
+  rename(location = province) %>%
+  mutate(location = gsub("í", "i", location)) %>%
+  mutate(location = gsub("á", "a", location))
+           
+dataEc2 <- dataEc2 %>%
+  mutate(location = NULL) %>%
+  rename(location = province)
+
+## add resolution
+dataEc1 <- dataEc1 %>%
+  add_column(resolution = NA)
+
+## I checked the original locations, vcum is by province and not by the location numbering
+
+```
+
+### percentage
+```{r}
+dataEc1 <- dataEc1 %>%
+  mutate(vperc = vcum/population*100)
+```
+
+### rename projection to value
+```{r}
+dataEc2 <- dataEc2 %>%
+  rename(value = "projection")
+```
+
+
+### get list of distinct locations
+this code grabs a list of the distinct locations for which we have SES data AND vaccine data
+```{r}
+distinctEc <- dataEc2 %>%
+  filter(measure == "income6") %>%
+  mutate(population = NULL) %>%
+  inner_join(dataEc1) %>%
+  filter(!is.na(vperc), !is.na(value)) %>%
+  ## no dose info
+  select(location) %>%
+  distinct()
+```
+
+### merge distinct with SES
+this code pulls out of the SES data only those locations for which we also have vaccine data
+```{r}
+dataEc <- inner_join(dataEc2, distinctEc, by = "location")
+```
+
+### bin SES data
+This code takes the SES data and cuts it into bins using cut_interval and ntile
+```{r}
+  
+## grab the Ec poverty data
+dataEc <- dataEc2 %>%
+  filter(measure == "income6") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("H","M", "L"), na.rm = T))
+
+  dataEc$nbin[dataEc$nbin == 1] <- "H"
+  dataEc$nbin[dataEc$nbin == 2] <- "M"
+  dataEc$nbin[dataEc$nbin == 3] <- "L"
+
+```
+
+### merge vaccine with SES
+merges the SES data with bins, to the vaccine data
+```{r}
+dataEc <- inner_join(dataEc1, dataEc, by = c("location", "country")) %>%
+  filter(!is.na(value), !is.na(vperc))
+```
+
+### pivot
+pivoting the SES bins into a column
+```{r}
+dataEc <- dataEc[c("country", "location","week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue")
+```
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+gridEc <- dataEc %>%
+  group_by(country, week, measure, bins, binvalue) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+## BANGLADESH
+
+Bangladesh started 27th of January, but  mass vaccination started Feb 7, when the data starts. I will use 27th of Jan as the start https://en.wikipedia.org/wiki/COVID-19_vaccination_in_Bangladesh
+
+### date to week 
+```{r}
+
+start <- c("2021-02-07")
+
+dataBA1 <- dataBA1 %>%
+  mutate(week = difftime(date, as.Date(start, "%Y-%m-%d"), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week))
+
+```
+
+### aggregate
+aggregate the data by location, week, and dose
+```{r}
+
+dataBA1 <- dataBA1 %>%
+  group_by(country, location, week, pop, dose, resolution) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(week) %>%
+  group_by(location, dose) %>%
+   mutate(vcum = cumsum(vnum)) %>%
+  ungroup()
+
+```
+
+### percentage
+calculate the percentage vaccinated
+```{r}
+
+dataBA1 <- dataBA1 %>%
+  mutate(vperc = vcum/pop* 100)
+```
+
+### get list of distinct locations
+this code grabs a list of the distinct locations for which we have SES data AND vaccine data
+```{r}
+distinctBA <- dataBA2 %>%
+  filter(measure == "income7") %>%
+  inner_join(dataBA1) %>%
+  filter(!is.na(vperc), !is.na(value)) %>%
+  filter(dose == "partial") %>%
+  select(location) %>%
+  distinct()
+```
+
+### merge distinct with SES
+this code pulls out of the SES data only those locations for which we also have vaccine data
+```{r}
+dataBA <- inner_join(dataBA2, distinctBA, by = c("location"))
+```
+
+### bin SES data
+This code takes the SES data and cuts it into bins using cut_interval and ntile
+```{r}
+
+## grab the BA income data
+dataBA <- dataBA %>%
+  filter(measure == "income7") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("L","M", "H"), na.rm = T))
+
+  dataBA$nbin[dataBA$nbin == 1] <- "L"
+  dataBA$nbin[dataBA$nbin == 2] <- "M"
+  dataBA$nbin[dataBA$nbin == 3] <- "H"
+```
+
+### merge vaccine with SES
+merges the SES data with bins, to the vaccine data
+```{r}
+dataBA <- inner_join(dataBA1, dataBA, by = c("location", "country")) %>%
+  filter(!is.na(value), !is.na(vperc))
+```
+
+### pivot
+pivoting the SES bins into a column
+```{r}
+dataBA <- dataBA[c("country", "location","week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue")
+
+```
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+gridBA <- dataBA %>%
+  group_by(country, week, measure, bins, binvalue) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+## US
+
+Note: CDC data already starts at the first week of vaccination for the US, as far as I can identify (Dec 14 was first dose, data starts dec 13)
+
+### fix the dips
+
+```{r warning = FALSE}
+
+## this code looks for the first date where the leading vperc is lower than the current vperc (BAD). If this happens, it returns the date. If it doesn't happen, it returns NA.
+
+## Then, it looks for the first date flagged. If no date is flagged, it returns the max date of the data. If any date is flagged, it returns the minimum such date.
+
+## Finally, the code filters so that all the dates are before or equal to the first flagged date. 
+
+dataUS1 <- dataUS1 %>%
+  group_by(location, dose) %>%
+  arrange(date) %>%
+  mutate(dateP = if_else(vperc > lead(vperc), date, NA_Date_)) %>%
+  mutate(datePF = if_else(all(is.na(dateP)), max(date, na.rm = T), min(dateP, na.rm = T))) %>%
+  filter(date <= datePF) %>%
+  ungroup() 
+
+## na.rm warning in so many groups?
+
+## in the ifelse, it tries to compute min(dateP), regardless of whether it actually uses it in the code. So, even if all(is.na(dateP)) is true (I have checked that this code works) it will still try to compute the minimum behind the scenes, which throws an error. Annoying, but I don't think there is an easy way to fix it; I thought about using a date far in the future instead of NA but this causes problems with when vperc = NA
+```
+
+
+### date to week
+This code counts the weeks since vaccination started. It also chooses the vperc for max date in a week and counts that as the percentage vaccinated for that week
+
+
+```{r "US date to week"}
+
+dataUS1 <- dataUS1 %>%
+  mutate(week = difftime(date, min(date, na.rm = T), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week)) %>%
+  group_by(location, dose, week) %>%
+  ## here we pick the max date in a week for a location, and filter out to just get the data for that date (i.e., we are pulling the most recent cumulative count for the week).
+  filter(date == max(date, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(date = NULL) %>%
+  ## for each location and dose type, find the maximum week recorded and tag it
+  group_by(location, dose) %>%
+  mutate(weekm = max(week, na.rm = T)) %>%
+  ungroup() %>%
+  ## for each state, look at the minimum maxweek tagged for each state and filter anything before that. This way, we stop smoothing the state data once locations start dropping off, so we don't get dips 
+  group_by(state, dose) %>%
+  filter(week <= min(weekm, na.rm = T)) %>%
+  ungroup()
+
+```
+
+### add state info to the SES
+```{r "state info"}
+
+state <- dataUS1[c(3,4)] %>%
+  distinct()
+dataUS2 <- left_join(dataUS2, state, by = "location")
+## this is to remove repeated rows, I'm not sure how rows ended up repeated. Might be because I pulled the metro and SVI data from the US vaccine data, so it would've duplicated rows because of dates
+dataUS2 <- dataUS2 %>% distinct()
+
+```
+
+### get list of distinct locations
+where we have both vaccine and SES
+```{r}
+distinctUS <- dataUS2 %>%
+  filter(measure == "income5" | measure == "income6") %>%
+  inner_join(dataUS1) %>%
+  filter(!is.na(vperc), !is.na(value)) %>%
+  select(location, measure) %>%
+  distinct()
+
+```
+
+```{r}
+dataUS <- inner_join(dataUS2, distinctUS, by = c("location", "measure"))
+```
+
+### get list of state counts
+This code filters out to get just the states with 20-100 counties (n=8)
+```{r}
+distinctStateUS <- datadistinct %>%
+  filter(country == "United States") %>%
+  mutate(country = NULL, resolution = NULL) %>%
+  filter(n < 100 & n >= 20) %>%
+  mutate(measure = NULL, n = NULL) %>%
+  distinct()
+
+##distinctStateUS$measure[distinctStateUS$measure == "income"] <- "income5"
+##distinctStateUS$measure[distinctStateUS$measure == "poverty"] <- "income6"
+
+## same set of states has over 100 observations for both income and poverty
+```
+
+```{r}
+dataUS <- inner_join(dataUS, distinctStateUS, by = c("state"))
+```
+
+
+### bin SES data
+This code takes the United States SES data and cuts it into bins using cut_interval and ntile
+```{r}
+
+## grab the US income data
+dataUSinc <- dataUS %>%
+  filter(measure == "income5") %>%
+  group_by(state) %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("L","M", "H"), na.rm = T)) %>%
+  ungroup()
+
+  dataUSinc$nbin[dataUSinc$nbin == 1] <- "L"
+  dataUSinc$nbin[dataUSinc$nbin == 2] <- "M"
+  dataUSinc$nbin[dataUSinc$nbin == 3] <- "H"
+  
+## grab the US poverty data
+dataUSpov <- dataUS %>%
+  filter(measure == "income6") %>%
+  group_by(state) %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("H","M", "L"), na.rm = T)) %>%
+  ungroup()
+
+  dataUSpov$nbin[dataUSpov$nbin == 1] <- "H"
+  dataUSpov$nbin[dataUSpov$nbin == 2] <- "M"
+  dataUSpov$nbin[dataUSpov$nbin == 3] <- "L"
+  
+  ## bind them back together
+  
+  dataUS <- rbind(dataUSpov, dataUSinc)
+```
+
+### merge vaccine with SES
+merges the SES data with bins, to the vaccine data
+```{r}
+dataUS <- inner_join(dataUS1, dataUS, by = c("location", "state")) %>%
+  filter(!is.na(value), !is.na(vperc))
+```
+
+### pivot
+pivoting the SES bins into a column, and filter out M bin
+```{r}
+dataUS <- dataUS[c("country","state", "location","week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue") 
+```
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+gridUS <- dataUS %>%
+  group_by(country, week, measure, bins, binvalue, state) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+## FRANCE
+### date to week 
+Vaccination started in France on Dec. 27 2020 https://en.wikipedia.org/wiki/COVID-19_vaccination_in_France which is reflected in the data. 
+```{r}
+start <- c("2020-12-27")
+
+dataFr1 <- dataFr1 %>%
+  mutate(week = difftime(date, as.Date(start, "%Y-%m-%d"), units = "weeks")) %>%
+  mutate( week = gsub(" weeks", "", week)) %>%
+  mutate(week = as.integer(week))
+```
+
+### aggregate/percentage
+aggregate the data by location, week, and dose
+```{r}
+
+dataFr1 <- dataFr1 %>%
+  group_by(country, resolution, pop, location, week, dose) %>%
+  summarise(vsum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(week) %>%
+  group_by(location) %>%
+  mutate(vcum = cumsum(vsum)) %>%
+  ungroup() %>%
+  mutate(vperc = 100*vcum/pop)
+
+```
+
+### get list of distinct locations
+this code grabs a list of the distinct locations for which we have SES data AND vaccine data
+```{r}
+distinctFr <- dataFr2 %>%
+  filter(measure == "income6" | measure == "income8") %>%
+  inner_join(dataFr1) %>%
+  filter(!is.na(vperc), !is.na(value)) %>%
+  filter(dose == "partial") %>%
+  select(location, measure) %>%
+  distinct()
+```
+
+### merge distinct with SES
+this code pulls out of the SES data only those locations for which we also have vaccine data
+```{r}
+dataFr <- inner_join(dataFr2, distinctFr, by = c("location", "measure"))
+```
+
+### bin SES data
+This code takes the SES data and cuts it into bins using cut_interval and ntile
+```{r}
+
+## income8 - median standard of living
+dataFrinc <- dataFr %>%
+  filter(measure == "income8") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("L","M", "H"), na.rm = T))
+
+  dataFrinc$nbin[dataFrinc$nbin == 1] <- "L"
+  dataFrinc$nbin[dataFrinc$nbin == 2] <- "M"
+  dataFrinc$nbin[dataFrinc$nbin == 3] <- "H"
+  
+## income6 - poverty
+dataFrpov <- dataFr %>%
+  filter(measure == "income6") %>%
+  mutate(nbin = ntile(x= value, n = 3)) %>%
+  mutate(cbin = cut_interval(value, n = 3, labels = c("H","M", "L"), na.rm = T))
+
+  dataFrpov$nbin[dataFrpov$nbin == 1] <- "H"
+  dataFrpov$nbin[dataFrpov$nbin == 2] <- "M"
+  dataFrpov$nbin[dataFrpov$nbin == 3] <- "L"
+  
+    ## bind them back together
+  
+  dataFr <- rbind(dataFrpov, dataFrinc)
+  
+```
+
+### merge vaccine with SES
+merges the SES data with bins, to the vaccine data
+```{r}
+dataFr <- inner_join(dataFr1, dataFr, by = c("location", "country")) %>%
+  filter(!is.na(value), !is.na(vperc))
+```
+
+### pivot
+pivoting the SES bins into a column, and filter out M bin
+```{r}
+dataFr <- dataFr[c("country", "location","week", "vperc", "measure", "value", "cbin", "nbin")]%>%
+  pivot_longer(cols = c("cbin", "nbin"), names_to = "bins", values_to = "binvalue") 
+```
+
+
+### grid summary
+computing average of location and bin, for H-L summaries
+```{r}
+gridFr <- dataFr %>%
+  group_by(country, week, measure, bins, binvalue) %>%
+  summarise(avg = mean(vperc)) %>%
+  ungroup()
+```
+
+
+
+## merge all the data
+```{r}
+
+MasterUSSES <- dataUS
+dataUSMaster <- dataUS[c("country", "location", "measure", "value", "bins", "binvalue")] %>% 
+  distinct() %>%
+   filter(binvalue == "L" | binvalue == "H")
+dataGridUS <- gridUS %>%
+  filter(binvalue == "L" | binvalue == "H")
+
+dataMaster <- rbind(dataPR, dataEc)
+dataMaster <- rbind(dataMaster, dataFr)
+dataMaster <- rbind(dataMaster, dataBA)
+
+MasterSES <- dataMaster[c("country", "location", "measure", "value", "bins", "binvalue")] %>% 
+  distinct()
+
+dataMaster <- dataMaster %>%
+  filter(binvalue == "L" | binvalue == "H")
+
+dataGrid <- rbind(gridPR, gridEc)
+dataGrid <- rbind(dataGrid, gridFr)
+dataGrid <- rbind(dataGrid, gridBA) %>%
+  filter(binvalue == "L" | binvalue == "H")
+
+
+
+```
+
+## grid calculations
+```{r}
+
+dataGrid <- dataGrid %>%
+  filter(!is.na(binvalue)) %>%
+  pivot_wider(names_from = binvalue, values_from = avg) %>%
+  mutate("H-L" = H - L) %>%
+  mutate("H/L" = H/L) %>%
+  ungroup()
+
+dataGrid <- dataGrid %>%
+  pivot_longer(7:8, names_to = "calctype", values_to = "calc")
+
+dataGridUS <- dataGridUS %>%
+  filter(!is.na(binvalue)) %>%
+  pivot_wider(names_from = binvalue, values_from = avg) %>%
+  mutate("H-L" = H - L) %>%
+  mutate("H/L" = H/L) %>%
+  ungroup()
+
+dataGridUS <- dataGridUS %>%
+  pivot_longer(8:9, names_to = "calctype", values_to = "calc")
+
+```
+
+## Bar Plots
+```{r}
+barplot <- datadistinct %>%
+  filter(country == "Bangladesh" | country == "Puerto Rico" | country == "Ecuador") %>%
+  ggplot(aes(x=country, y=n)) +
+  geom_bar(stat="identity") + facet_grid(
+  rows = vars(measure),
+  cols = vars(resolution),
+  scales = "free")
+barplot
+
+```
+
+## percent plots
+```{r}
+nseriesplot <- dataMaster %>%
+  filter(bins == "nbin") %>%
+ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.07) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + theme_minimal()
+nseriesplot
+
+```
+
+
+```{r}
+nseriesplot <- dataMaster %>%
+  filter(bins == "nbin", country == "France") %>%
+ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.07) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + theme_minimal()
+nseriesplot
+
+```
+```{r}
+cseriesplot <- dataMaster %>%
+  filter(bins == "cbin", country == "France") %>%
+ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.07) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + theme_minimal()
+cseriesplot
+
+```
+
+```{r}
+Ecuadornseriesplot <- dataMaster %>%
+  filter(bins == "nbin", country == "Ecuador")
+
+Ecuadornseriesplot$country[Ecuadornseriesplot$country == "Ecuador"] <- "Ecuador (n=22)"
+Ecuadornseriesplot$measure[Ecuadornseriesplot$measure == "income6"] <- ""
+
+Ecuadornseriesplot <- Ecuadornseriesplot %>% 
+  ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.25) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + theme_minimal() + labs(y= "% vaccinated", x = "weeks since vaccination started")
+Ecuadornseriesplot
+
+```
+
+
+```{r}
+cseriesplot <- dataMaster %>%
+  filter(bins == "cbin") %>%
+ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.25) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + scale_color_manual(values=met.brewer("NewKingdom",2))+ theme_minimal()
+cseriesplot
+
+```
+
+```{r}
+Ecuadorcseriesplot <- dataMaster %>%
+  filter(bins == "cbin", country == "Ecuador")
+
+Ecuadorcseriesplot$country[Ecuadorcseriesplot$country == "Ecuador"] <- "Ecuador (n=22)"
+Ecuadorcseriesplot$measure[Ecuadorcseriesplot$measure == "income6"] <- ""
+
+Ecuadorcseriesplot <- Ecuadorcseriesplot %>% 
+  ggplot(aes(x = week, y = vperc)) + geom_smooth(aes(color = binvalue, group = binvalue)) + geom_line(aes(color = binvalue, group = location), alpha=.25) + facet_grid(
+  rows = vars(measure),
+  cols = vars(country),
+  scales = "free") + theme_minimal() + labs(y= "% vaccinated", x = "weeks since vaccination started")
+Ecuadorcseriesplot
+
+```
+
+## difference and ratio plots
+```{r}
+diffFrance <- dataGrid %>%
+  filter(calctype == "H-L", country == "France") 
+
+  diffFrance$country[diffFrance$country == "France"] <- "France (n=98)"
+
+diffFrance %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(measure)) + ggtitle("Difference H-L of avg vaccination")
+```
+
+
+
+```{r}
+diffmedian <- dataGrid %>%
+  filter(calctype == "H-L", measure == "income5") 
+
+  diffmedian$country[diffmedian$country == "Puerto Rico"] <- "Puerto Rico (n=76)"
+
+diffmedian %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Difference H-L of avg vaccination (median household income)")
+```
+
+```{r}
+ratiomedian <- dataGrid %>%
+  filter(calctype == "H/L", measure == "income5") 
+
+  ratiomedian$country[ratiomedian$country == "Puerto Rico"] <- "Puerto Rico (n=76)"
+
+ratiomedian %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Ratio H/L of avg vaccination (median household income)")
+```
+
+
+```{r}
+diffpov <- dataGrid %>%
+  filter(calctype == "H-L", measure == "income6") 
+
+  diffpov$country[diffpov$country == "Puerto Rico"] <- "Puerto Rico (n=76)"
+   diffpov$country[diffpov$country == "Ecuador"] <- "Ecuador (n=22)"
+
+diffpov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Difference H-L of avg vaccination (pct in poverty)")
+```
+
+```{r}
+ratiopov <- dataGrid %>%
+  filter(calctype == "H-L", measure == "income6") 
+
+ratiopov$country[ratiopov$country == "Puerto Rico"] <- "Puerto Rico (n=76)"
+   ratiopov$country[ratiopov$country == "Ecuador"] <- "Ecuador (n=22)"
+
+ratiopov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Ratio H/L of avg vaccination (pct in poverty)")
+```
+
+```{r}
+diffworldpop <- dataGrid %>%
+  filter(calctype == "H-L", measure == "income7") 
+
+  diffworldpop$country[diffworldpop$country == "Bangladesh"] <- "Bangladesh (n=55)"
+
+diffworldpop %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Difference H-L of avg vaccination (worldpop income index)")
+```
+
+
+```{r}
+ratioworldpop <- dataGrid %>%
+  filter(calctype == "H-L", measure == "income7") 
+
+  ratioworldpop$country[ratioworldpop$country == "Bangladesh"] <- "Bangladesh (n=55)"
+
+ratioworldpop %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(country)) + ggtitle("Ratio H/L of avg vaccination (worldpop income index)")
+```
+### US more than 10 weeks
+
+```{r}
+diffMHI <- dataGridUS %>%
+  filter(calctype == "H-L", measure == "income5") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) > 10) %>%
+  ungroup()
+
+diffMHI %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Difference H-L of avg vaccination (MHI)")
+```
+
+```{r}
+ratioMHI <- dataGridUS %>%
+  filter(calctype == "H/L", measure == "income5") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) > 10) %>%
+  ungroup()
+
+ratioMHI %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Ratio H/L of avg vaccination (MHI)")
+```
+
+```{r}
+diffpov <- dataGridUS %>%
+  filter(calctype == "H-L", measure == "income6") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) > 10) %>%
+  ungroup()
+
+diffpov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Difference H-L of avg vaccination (pct pov)")
+```
+
+```{r}
+ratiopov <- dataGridUS %>%
+  filter(calctype == "H/L", measure == "income6") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) > 10) %>%
+  ungroup()
+
+ratiopov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Ratio H/L of avg vaccination (pct pov)")
+```
+
+### US less than or equal to 10 weeks 
+
+
+```{r}
+
+
+diffMHI <- dataGridUS %>%
+  filter(calctype == "H-L", measure == "income5")  %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) <= 10) %>%
+  ungroup()
+
+diffMHI %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Difference H-L of avg vaccination (MHI)")
+```
+
+```{r}
+ratioMHI <- dataGridUS %>%
+  filter(calctype == "H/L", measure == "income5") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) <= 10) %>%
+  ungroup()
+
+ratioMHI %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Ratio H/L of avg vaccination (MHI)")
+```
+
+```{r}
+diffpov <- dataGridUS %>%
+  filter(calctype == "H-L", measure == "income6")  %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) <= 10) %>%
+  ungroup()
+
+diffpov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 0, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Difference H-L of avg vaccination (pct pov)")
+```
+
+```{r}
+ratiopov <- dataGridUS %>%
+  filter(calctype == "H/L", measure == "income6") %>%
+  group_by(state) %>%
+  filter(max(week, na.rm = T) <= 10) %>%
+  ungroup()
+
+ratiopov %>% ggplot(aes(x = week, y = calc, group = country)) + geom_line()  + geom_hline(yintercept = 1, lty = 3) + facet_grid(
+  rows = vars(bins),
+  cols = vars(state)) + ggtitle("Ratio H/L of avg vaccination (pct pov)")
+```
+
+
+## SES plots
+
+```{r}
+PRplot <- MasterSES %>%
+  filter(country == "Puerto Rico") %>%
+  arrange(value) %>%
+  ggplot() + geom_point(aes(x = location, y = value, color = binvalue)) + facet_grid(
+  rows = vars(measure),
+  cols = vars(bins), 
+  scales = "free") + theme(
+  axis.text.x = element_blank(),
+  axis.ticks = element_blank())
+PRplot
+
+```
+
+
+```{r}
+ECplot <- MasterSES %>%
+  filter(country == "Ecuador") %>%
+  arrange(value) %>%
+  ggplot() + geom_point(aes(x = location, y = value, color = binvalue)) + facet_grid(
+  rows = vars(measure),
+  cols = vars(bins), 
+  scales = "free")+ theme(
+  axis.text.x = element_blank(),
+  axis.ticks = element_blank())
+ECplot
+
+```
+
+```{r}
+BAplot <- MasterSES %>%
+  filter(country == "Bangladesh") %>%
+  arrange(value) %>%
+  ggplot() + geom_point(aes(x = location, y = value, color = binvalue)) + facet_grid(
+  rows = vars(measure),
+  cols = vars(bins), 
+  scales = "free") + theme(
+  axis.text.x = element_blank(),
+  axis.ticks = element_blank())
+BAplot
+
+```
+### US
+
+```{r}
+USplot5 <- MasterUSSES %>%
+  filter(measure == "income5") %>%
+  arrange(value) %>%
+  ggplot() + geom_point(aes(x = location, y = value, color = binvalue)) + facet_grid(
+  rows = vars(state),
+  cols = vars(bins), 
+  scales = "free") + theme(
+  axis.text.x = element_blank(),
+  axis.ticks = element_blank())
+USplot5
+
+```
+
+```{r}
+USplot6 <- MasterUSSES %>%
+  filter(measure == "income6") %>%
+  arrange(value) %>%
+  ggplot() + geom_point(aes(x = location, y = value, color = binvalue)) + facet_grid(
+  rows = vars(state),
+  cols = vars(bins), 
+  scales = "free") + theme(
+  axis.text.x = element_blank(),
+  axis.ticks = element_blank())
+USplot6 
+
+```
+

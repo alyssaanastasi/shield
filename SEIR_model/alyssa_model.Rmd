@@ -1,0 +1,406 @@
+---
+title: "SEIR model with vaccination and SES disparities"
+author: "Sophie Larsen and Pamela P. Martinez"
+date: "`r format(Sys.time(), '%B %Y')`"
+  output:
+  pdf_document: default
+  html_document: default
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(deSolve)
+library(tidyverse)
+library(MetBrewer)
+library(directlabels)
+library(cowplot)
+library(viridis)
+library(RColorBrewer)
+library(MetBrewer)
+library(ggrepel)
+library(spatstat.utils)
+source("alyssa_seir.R")
+source("alyssa_SEIR_params.R")
+```
+
+
+## Average params
+
+```{r}
+dataAvg <- read_csv("../../Data/data_figures/dataOut.csv") %>%
+  group_by(ID) %>% arrange(Week) %>%
+  mutate(dailyVac =  c(Vac[1],diff(Vac)),
+         VacCumSum = cumsum(dailyVac)) %>% 
+  ungroup() %>% arrange(ID, Week) %>%
+  mutate(Day = Week*7-7+1, dailyVac=dailyVac/7)
+
+dataAvgPars <- dataAvg %>% 
+  select(-c(ID,Week,Vac,Day,dailyVac,VacCumSum)) %>% 
+  distinct() %>% pivot_longer(mean_MaxVac:mean_h) %>%
+  pivot_wider(names_from = SES, values_from = value) %>%
+  mutate(diff = round(H - L, digits = 3), 
+         H = round(H, digits = 3), 
+         L = round(L, digits = 3))
+
+
+paramsTableAll <- read_csv("../../Data/data_figures/paramsTable.csv")
+
+
+paramsTableStats <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Group, Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(Group = recode(Group, `1` = "S", `2` = "C"),
+         deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(100*deltaVm, digits = 0))
+
+paramsTableStatsNoGroup <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(100*deltaVm, digits = 0))
+
+paramsAvg <- paramsTableAll %>% ## group 2 is concave
+  select(Group, SES:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Group, SES, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Group = recode(Group, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(100*MaxVac, digits = 0))
+
+paramsAvgNoSES <- paramsTableAll %>% ## group 2 is concave
+  select(Group, MaxVac:h) %>% pivot_longer(cols=MaxVac:h) %>%
+  group_by(Group, name) %>% summarise(avg = mean(value)) %>%
+  ungroup() %>% 
+  pivot_wider(names_from = name, values_from = avg) %>%
+  mutate(Group = recode(Group, `1` = "S", `2` = "C")) %>%
+  mutate(WVH = round(WVH, digits = 0), 
+         MaxVac = round(100*MaxVac, digits = 0))
+
+```
+
+## Averaging high and low
+```{r}
+datAvgVacc <- dataAvgPars %>% group_by(Group, name) %>%
+  summarise(H = (H+L)/2, L = H) %>%
+  ungroup()
+```
+
+## Vaccination rates with avg params (figure 3A)
+
+```{r}
+paramV <- dataAvgPars %>% select(Group, params = name, H, L) %>%
+  mutate(type = case_when(Group == 2 ~ "C",
+                          Group == 1 ~ "S",
+                          TRUE ~ NA_character_)) %>%
+  pivot_longer(cols = H:L, names_to = "name") %>%
+  select(type,name,params, value) %>%
+  pivot_wider(names_from = params, values_from = value)
+
+paramVAvg <- datAvgVacc %>% select(Group, params = name, H, L) %>%
+  mutate(type = case_when(Group == 2 ~ "C Avg",
+                          Group == 1 ~ "S Avg",
+                          TRUE ~ NA_character_)) %>%
+  pivot_longer(cols = H:L, names_to = "name") %>%
+  select(type,name,params, value) %>%
+  pivot_wider(names_from = params, values_from = value)
+
+### Concave
+paramsCL <- paramV %>% filter(type == "C", name == "L")
+paramsCH <- paramV %>% filter(type == "C", name == "H")
+vaccL <- vacc_weekly(Vmax = paramsCL$mean_MaxVac, 
+                     WVH = paramsCL$mean_WVH, k = paramsCL$mean_h)
+
+vaccH <- vacc_weekly(Vmax = paramsCH$mean_MaxVac, 
+                     WVH = paramsCH$mean_WVH, k = paramsCH$mean_h)
+
+datCV <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>% 
+  pivot_longer(H:L) %>% mutate(type = "C") %>% left_join(paramV)
+
+### Sigmoidal
+paramsSL <- paramV %>% filter(type == "S", name == "L")
+paramsSH <- paramV %>% filter(type == "S", name == "H")
+vaccL <- vacc_weekly(Vmax = paramsSL$mean_MaxVac, 
+                     WVH = paramsSL$mean_WVH, k = paramsSL$mean_h)
+
+vaccH <- vacc_weekly(Vmax = paramsSH$mean_MaxVac, 
+                     WVH = paramsSH$mean_WVH, k = paramsSH$mean_h)
+
+datSV <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>%
+  pivot_longer(H:L) %>% mutate(type = "S") %>% left_join(paramV)
+
+### Averaged Concave
+paramsAC <- paramVAvg %>% filter(type == "C Avg") 
+
+vaccL <- vacc_weekly(Vmax = paramsAC$mean_MaxVac, 
+                     WVH = paramsAC$mean_WVH, k = paramsAC$mean_h)
+
+vaccH <- vacc_weekly(Vmax = paramsAC$mean_MaxVac, 
+                     WVH = paramsAC$mean_WVH, k = paramsAC$mean_h)
+
+datACV <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>%
+  pivot_longer(H:L) %>% mutate(type = "C Avg") %>% left_join(paramVAvg)
+
+
+### Averaged Sigmoidal
+paramsAS <- paramVAvg %>% filter(type == "S Avg") 
+
+vaccL <- vacc_weekly(Vmax = paramsAS$mean_MaxVac, 
+                     WVH = paramsAS$mean_WVH, k = paramsAS$mean_h)
+
+vaccH <- vacc_weekly(Vmax = paramsAS$mean_MaxVac, 
+                     WVH = paramsAS$mean_WVH, k = paramsAS$mean_h)
+
+datASV <- tibble(time = 1:420, H = vaccH(time), L = vaccL(time)) %>%
+  pivot_longer(H:L) %>% mutate(type = "S Avg") %>% left_join(paramVAvg)
+
+
+#write_csv(rbind(datSV, datCV) %>% rbind(datASV) %>% rbind(datACV), "../../Data/data_figures/daily_vacc_avg_3A.csv")
+```
+
+
+## No vaccination
+
+```{r}
+source("alyssa_seir.R")
+source("alyssa_SEIR_params.R")
+times <- 1:420
+vaccC <- function(t){0}
+vaccCA <- function(t){0}
+vaccP <- function(t){0}
+
+outNoVac <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(name = fct_relevel(name, names(init)),
+         type = "No vaccination") %>%
+  mutate(group = case_when(
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2|Inf_C1|^Inf_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA|Inf_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P|Inf_P", name) ~ "Adults with Children (Parents)",
+  )) %>%
+    mutate(label = case_when(
+      grepl("^S_.*1$", name) ~ "Susceptible (First)",
+      grepl("^S_.*2$", name) ~ "Susceptible (Second)",
+      grepl("^E_.*1$", name) ~ "Exposed (First)",
+      grepl("^E_.*2$", name) ~ "Exposed (Second)",
+      grepl("^Inf_.*1$", name) ~ "Infected (First)",
+      grepl("^Inf_.*2$", name) ~ "Infected (Second)",
+      grepl("^R_.*1$", name) ~ "Recovered (First)",
+      grepl("^R_.*2$", name) ~ "Recovered (Second)",
+      grepl("^D_.*1$", name) ~ "Dead (First)",
+      grepl("^D_.*2$", name) ~ "Dead (Second)"
+  ))
+
+
+plotNoVac <- outNoVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scales = "free", ncol = 1)
+
+```
+
+```{R}
+plotNoVac
+```
+
+## Run k-value analysis
+
+### First 7 months without vacc.
+
+```{r}
+#### First run ####
+times <- 1:210
+vaccL <- function(t){0}
+vaccH <- function(t){0}
+
+outFirst <- ode(y=init, func = seir, times=times, parms = parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) 
+
+initSec <- outFirst %>% filter(time == max(time)) %>% 
+  pull(value, name) %>% round()
+```
+
+### Average Disparity 
+
+#### k = 1
+
+```{r}
+
+paramsDisp1 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1), k_H=1) %>%
+  mutate(Vm_L = Vm_H - 0.07, Wh_L = Wh_H + 1, k_L = 1)
+
+#### Second run 
+outD1 <- tibble(NULL)
+for(i in 1:nrow(paramsDisp1)){ ## 
+  vaccH <- vacc_weekly(Vmax = paramsDisp1$Vm_H[i], WVH = paramsDisp1$Wh_H[i], 
+                       k = paramsDisp1$k_H[i])
+  vaccL <- vacc_weekly(Vmax = paramsDisp1$Vm_L[i], WVH = paramsDisp1$Wh_L[i], 
+                       k = paramsDisp1$k_L[i])
+  initP <- outFirst %>% filter(time == max(time)) %>%
+    pull(value, name) %>% round()
+  outDF <- ode(y=initP, func = seir, times=times, parms = parms) %>%
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(name %in% c("Inf_L1", "Inf_L2", "Inf_H1", "Inf_H2","D_L1","D_H1", "D_L2", "D_H2"),
+           time == max(time)) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>% 
+    count(Variable, wt=value, name = "Counts") %>% mutate(ID = i) %>%
+    mutate(Variable = recode(Variable, D = "Deaths", `Inf` = "Infections")) %>%
+    pivot_wider(names_from = Variable, values_from = Counts)
+  outD1 <- outD1 %>% rbind(outDF)
+}
+
+outParsDisp1 <- paramsDisp1 %>% mutate(ID=row_number()) %>% 
+  left_join(outD1) %>% mutate(type = "k=1", strat = "Disparity")
+
+```
+
+#### k = 2
+
+```{r}
+
+paramsDisp2 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1), k_H=2) %>%
+  mutate(Vm_L = Vm_H - 0.07, Wh_L = Wh_H + 1, k_L = 2)
+
+#### Second run 
+outD2 <- tibble(NULL)
+for(i in 1:nrow(paramsDisp2)){ ## 
+  vaccH <- vacc_weekly(Vmax = paramsDisp2$Vm_H[i], WVH = paramsDisp2$Wh_H[i], 
+                       k = paramsDisp2$k_H[i])
+  vaccL <- vacc_weekly(Vmax = paramsDisp2$Vm_L[i], WVH = paramsDisp2$Wh_L[i], 
+                       k = paramsDisp2$k_L[i])
+  initP <- outFirst %>% filter(time == max(time)) %>%
+    pull(value, name) %>% round()
+  outDF <- ode(y=initP, func = seir, times=times, parms = parms) %>%
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(name %in% c("Inf_L1", "Inf_L2", "Inf_H1", "Inf_H2","D_L1","D_H1", "D_L2", "D_H2"),
+           time == max(time)) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>% 
+    count(Variable, wt=value, name = "Counts") %>% mutate(ID = i) %>%
+    mutate(Variable = recode(Variable, D = "Deaths", `Inf` = "Infections")) %>%
+    pivot_wider(names_from = Variable, values_from = Counts)
+  outD2 <- outD2 %>% rbind(outDF)
+}
+
+outParsDisp2 <- paramsDisp2 %>% mutate(ID=row_number()) %>% 
+  left_join(outD2) %>% mutate(type = "k=2", strat = "Disparity")
+
+```
+
+#### k = 3
+
+```{r}
+
+paramsDisp3 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1), k_H=3) %>%
+  mutate(Vm_L = Vm_H - 0.07, Wh_L = Wh_H + 1, k_L = 3)
+
+#### Second run 
+outD3 <- tibble(NULL)
+for(i in 1:nrow(paramsDisp3)){ ## 
+  vaccH <- vacc_weekly(Vmax = paramsDisp3$Vm_H[i], WVH = paramsDisp3$Wh_H[i], 
+                       k = paramsDisp3$k_H[i])
+  vaccL <- vacc_weekly(Vmax = paramsDisp3$Vm_L[i], WVH = paramsDisp3$Wh_L[i], 
+                       k = paramsDisp3$k_L[i])
+  initP <- outFirst %>% filter(time == max(time)) %>%
+    pull(value, name) %>% round()
+  outDF <- ode(y=initP, func = seir, times=times, parms = parms) %>%
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(name %in% c("Inf_L1", "Inf_L2", "Inf_H1", "Inf_H2","D_L1","D_H1", "D_L2", "D_H2"),
+           time == max(time)) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>% 
+    count(Variable, wt=value, name = "Counts") %>% mutate(ID = i) %>%
+    mutate(Variable = recode(Variable, D = "Deaths", `Inf` = "Infections")) %>%
+    pivot_wider(names_from = Variable, values_from = Counts)
+  outD3 <- outD3 %>% rbind(outDF)
+}
+
+outParsDisp3 <- paramsDisp3 %>% mutate(ID=row_number()) %>% 
+  left_join(outD3) %>% mutate(type = "k=3", strat = "Disparity")
+
+```
+
+#### k = 4
+
+```{r}
+
+paramsDisp4 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1), k_H=4) %>%
+  mutate(Vm_L = Vm_H - 0.07, Wh_L = Wh_H + 1, k_L = 4)
+
+#### Second run 
+outD4 <- tibble(NULL)
+for(i in 1:nrow(paramsDisp4)){ ## 
+  vaccH <- vacc_weekly(Vmax = paramsDisp4$Vm_H[i], WVH = paramsDisp4$Wh_H[i], 
+                       k = paramsDisp4$k_H[i])
+  vaccL <- vacc_weekly(Vmax = paramsDisp4$Vm_L[i], WVH = paramsDisp4$Wh_L[i], 
+                       k = paramsDisp4$k_L[i])
+  initP <- outFirst %>% filter(time == max(time)) %>%
+    pull(value, name) %>% round()
+  outDF <- ode(y=initP, func = seir, times=times, parms = parms) %>%
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(name %in% c("Inf_L1", "Inf_L2", "Inf_H1", "Inf_H2","D_L1","D_H1", "D_L2", "D_H2"),
+           time == max(time)) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>% 
+    count(Variable, wt=value, name = "Counts") %>% mutate(ID = i) %>%
+    mutate(Variable = recode(Variable, D = "Deaths", `Inf` = "Infections")) %>%
+    pivot_wider(names_from = Variable, values_from = Counts)
+  outD4 <- outD4 %>% rbind(outDF)
+}
+
+outParsDisp4 <- paramsDisp4 %>% mutate(ID=row_number()) %>% 
+  left_join(outD4) %>% mutate(type = "k=4", strat = "Disparity")
+
+```
+
+#### k = 5
+
+```{r}
+
+paramsDisp5 <- expand_grid(Vm_H=seq(0.5,1,0.02), Wh_H=seq(5,30,1), k_H=5) %>%
+  mutate(Vm_L = Vm_H - 0.07, Wh_L = Wh_H + 1, k_L = 5)
+
+#### Second run 
+outD5 <- tibble(NULL)
+for(i in 1:nrow(paramsDisp5)){ ## 
+  vaccH <- vacc_weekly(Vmax = paramsDisp5$Vm_H[i], WVH = paramsDisp5$Wh_H[i], 
+                       k = paramsDisp5$k_H[i])
+  vaccL <- vacc_weekly(Vmax = paramsDisp5$Vm_L[i], WVH = paramsDisp5$Wh_L[i], 
+                       k = paramsDisp5$k_L[i])
+  initP <- outFirst %>% filter(time == max(time)) %>%
+    pull(value, name) %>% round()
+  outDF <- ode(y=initP, func = seir, times=times, parms = parms) %>%
+    as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+    filter(name %in% c("Inf_L1", "Inf_L2", "Inf_H1", "Inf_H2","D_L1","D_H1", "D_L2", "D_H2"),
+           time == max(time)) %>% 
+    separate(name, c("Variable","SES"), sep = "_") %>% 
+    count(Variable, wt=value, name = "Counts") %>% mutate(ID = i) %>%
+    mutate(Variable = recode(Variable, D = "Deaths", `Inf` = "Infections")) %>%
+    pivot_wider(names_from = Variable, values_from = Counts)
+  outD5 <- outD5 %>% rbind(outDF)
+}
+
+outParsDisp5 <- paramsDisp5 %>% mutate(ID=row_number()) %>% 
+  left_join(outD5) %>% mutate(type = "k=5", strat = "Disparity")
+
+```
+
+## Save grid outcomes
+```{r}
+outGridSupp <-outParsDisp1 %>% rbind(outParsDisp2) %>% 
+  rbind(outParsDisp3) %>% rbind(outParsDisp4) %>% rbind(outParsDisp5)
+  
+  
+write_csv(outGridSupp, "../../Data/data_figures/supp_grid_outcomes.csv")
+
+```

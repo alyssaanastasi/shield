@@ -1,0 +1,1953 @@
+---
+title: "LarsenEtAl_figures"
+author: "Sophie L. Larsen and Pamela P. Martinez"
+date: "`r format(Sys.time(), '%B %Y')`"
+output: html_notebook
+  output:
+  pdf_document: default
+  html_document: default
+
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_knit$set(root.dir = normalizePath("C:/Users/sophi/Box/Vaccine_inequity/FINAL FIGURES")) 
+library(tidyverse)
+library(viridis)
+library(lubridate)
+library(dineq)
+library(cowplot)
+library(readxl)
+library(MetBrewer)
+library(directlabels)
+library(ggrepel)
+library(ggpubr)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(scales)
+library(ggrepel)
+library(readxl)
+library(RColorBrewer)
+library(tidytext)
+library(lemon)
+```
+
+## Data
+
+```{r}
+
+###### data for Lorenz curve ######
+LorenzData <- read_csv("../../Data/data_figures/LorenzData.csv")
+
+#### time series data ####
+dataT <- read_csv("../../Data/data_figures/dataT.csv", col_types = cols (state = "c")) %>%
+  filter(country != "Kenya")
+
+dataTstar <- read_csv("../../Data/data_figures/dataTstar.csv", col_types = cols (state = "c")) %>%
+  filter(country != "Kenya")
+
+dataTloc <- read_csv("../../Data/data_figures/locdata.csv", col_types = cols (state = "c")) %>%
+  filter(country != "Kenya") %>%
+  mutate(Name = case_when(is.na(state) ~ country, 
+                          TRUE ~ paste(country, state, sep = ", ")),
+         value = value/100)
+
+dataTC <- dataT %>% select(Name, weeks_length) %>% distinct()
+
+## fullsimh <- read_csv("../../Data/data_figures/timedata.csv")
+
+dataTexampAll <- read_csv("../../Data/data_figures/dataTexampAll.csv")
+
+## hdatadisparity <- read_csv("../../Data/data_figures/hdatadisparity.csv") %>%
+ ## mutate(Scenario = "disparity")
+##hdataequality <- read_csv("../../Data/data_figures/hdataequality.csv") %>%
+ ## mutate(Scenario = "equality")
+
+##hdatadisparityvax <- read_csv("../../Data/data_figures/hdatadisparityvax.csv") %>%
+##  mutate(Scenario = "disparity (delated vaccination)")
+##hdataequalityvax <- read_csv("../../Data/data_figures/hdataequalityvax.csv") %>%
+##  mutate(Scenario = "equality (delayed vaccination)")
+
+## datOut <- read_csv("../../Data/data_figures/dataOut.csv")
+
+### type-III parameters ###
+paramsTableAll <- read_csv("../../Data/data_figures/paramsTable.csv")
+paramsTableAllSupp <- read_csv("../../Data/data_figures/paramsTableSupp.csv") %>% filter(Name == "United States" | Name == "Brazil") %>%
+  ## based on original clustering, US H should be group 2
+  mutate(Group = if_else(Name == "United States"& SES == "H", 2, Group))
+
+##### Geographic and GDP data #####
+dataMap <- read_csv("../../Data/data_figures/dataMap.csv") %>%
+  mutate(resolution = if_else(country == "Kenya", "less than 50% vaccinated", resolution))
+
+dataGDP <- read_csv("../../Data/data_figures/dataGDP.csv")
+
+dataCont <- read_csv("../../Data/data_figures/dataCont.csv")
+
+BrUS <- c("Brazil","United States")
+contBrUS <- c("South America","North America")
+
+dataCont2 <- data.frame(BrUS, contBrUS) %>%
+  rename(Name = 1, continent = 2)
+
+ContFull <- rbind(dataCont, dataCont2)
+
+world <- ne_countries(scale = "medium", returnclass = "sf") %>% 
+  rename(country = admin) %>%
+  left_join(dataMap, by = "country") %>%
+   mutate(resolution = if_else(is.na(resolution), "unknown", resolution)) %>%
+  mutate(resolution = if_else(subunit == "Greenland", "not included", resolution)) %>%
+  mutate(resolution = fct_relevel(resolution,"100 or more locations",
+                 "21-99 locations",
+                 "12-20 locations",
+                 "less than 50% vaccinated",
+                 "not included",
+                 "unknown"))
+class(world)
+
+#### Gini coefficient data #####
+
+dataGiniCapeVerde <- read_excel("../../Data/data_figures/dataGiniCV.xlsx")
+
+dataGiniUS <- read_csv("../../Data/data_figures/dataGiniUS.csv") %>%
+  mutate(country = paste("United States,", StateAbbrev)) %>% group_by(country) %>%
+  summarise(gini = giniCoefficient)
+
+dataBrStatesGini <- read_excel("../../Data/data_figures/BrazilStatesGini.xlsx") %>%
+  rename(country = Country) %>%
+  mutate(gini = 100*gini)
+
+dataGini <- read_csv("../../Data/data_figures/dataGini.csv") %>%
+  mutate(country = recode(country, `United Kingdom` = "UK",
+        `South Korea` = "Republic of Korea")) %>%
+  rbind(dataGiniCapeVerde) %>%
+  mutate(gini = if_else(is.na(giniWB), giniCIA, giniWB)) %>%
+  group_by(country) %>%
+  summarise(gini) %>%
+  ungroup() %>%
+  rbind(dataGiniUS) %>%
+  rbind(dataBrStatesGini)
+
+dataBrUS <- read_csv("../../Data/data_figures/BrUSGini.csv") %>% 
+  mutate(n = NULL)
+dataBrUSparam <- read_csv("../../Data/data_figures/BrUSGiniParam.csv")
+
+levN <- unique(dataTstar %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+### Countries/state table ####
+tablex <- dataT %>% select(Name, numberLoc, continent) %>% distinct() %>%
+  arrange(continent) %>% as.tibble()
+
+colOrder <- tablex %>% select(continent) %>% distinct()
+
+### Plot 3A ####
+dataVac3A <- read_csv("../../Data/data_figures/daily_vacc_avg_3A.csv")
+
+### Plot 4 ####
+
+#dataFig4 <- read_csv("../../Data/data_figures/figure4_outcomes.csv")
+
+### Plot 5 ####
+dataVac4A <- read_csv("../../Data/data_figures/daily_vacc_avg_4A.csv")
+
+
+
+###### figure 4 ######
+data4A <- read_csv("../../Data/data_figures/daily_vacc_avg_4A.csv")
+data4B <- read_csv("../../Data/data_figures/daily_vacc_t0.csv")
+data4C <- read_csv("../../Data/data_figures/daily_vacc_t210.csv")
+data4D <- read_csv("../../Data/data_figures/outcomes_4D.csv")
+data4E <- read_csv("../../Data/data_figures/outcomes_4E.csv") %>%
+  mutate(ScenarioVm = recode(ScenarioVm, `best case` = "Equity in Vm: best case",
+                             `worst case` = "Disparity in Vm: worst case"),
+         ScenarioWh = recode(ScenarioWh, `best case` = "Equity in Wh: best case",
+                             `worst case` = "Disparity in Wh: worst case"),
+         type = recode(type, Cocave = "Concave"),
+         ScenarioVm = fct_relevel(ScenarioVm, "Equity in Vm: best case"),
+         ScenarioWh = fct_relevel(ScenarioWh, "Equity in Wh: best case"))
+  
+dataDots4E <- read_csv("../../Data/data_figures/places_individual_averted.csv")
+##### supplementary model outcomes #####
+
+dataGridSupp <- read_csv("../../Data/data_figures/supp_grid_outcomes.csv")
+dataRefSupp <- read_csv("../../Data/data_figures/daily_vacc_t210.csv")
+
+
+dataGridHL <- read_csv("../../Data/data_figures/HvsL.csv")
+
+#### extreme trends #######
+trends_full <- read_csv( "../../Data/data_figures/extremetrends.csv")
+
+```
+
+###########################################
+###########################################
+
+
+### Supp 1: Trends over time by country
+
+```{r}
+excluded <- setdiff(unique(dataTstar$Name), 
+                     unique(dataTexampAll$Name))
+levNS1 <- case_when(levN %in% excluded ~ paste0(levN, "*"), TRUE ~ levN)
+plotsupp1 <- dataTstar %>% left_join(dataCont) %>%
+  mutate(type = "observed", Name = case_when(
+           Name %in% excluded ~ paste0(Name, "*"), TRUE ~ Name)) %>% 
+  mutate(Name = factor(Name, levels = levNS1)) %>%
+  select(Name, week, H, L, type, continent) %>%
+  pivot_longer(cols = H:L,names_to = "SES", values_to = "PropV") %>%
+  arrange(continent) %>% mutate(PropV = 100*PropV,
+         SES = recode(SES, H = "High", L = "Low")) %>% 
+  ggplot(aes(week, PropV, col = continent)) + 
+  facet_wrap(~Name, scales = "free", ncol = 9) + 
+  scale_color_manual("Continent", values=cols) + 
+  geom_point(data=. %>% filter(type == "observed") %>% 
+               rename(Observed = SES), 
+             aes(alpha = Observed), size = 0.3) + theme_classic() + 
+  scale_alpha_manual("SES", values = c(1,0.3)) + 
+  scale_x_continuous("Week", breaks = seq(0,60,20), limits = c(0,65)) + 
+  scale_y_continuous("Percentage of the population vaccinated with at least one dose", breaks = seq(0,80,40), limits = c(0,99)) + 
+  guides(alpha = guide_legend(override.aes = list(size=1.5)),
+         color = guide_legend(order = 1, override.aes = list(size=1.5))) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 14),
+        legend.title = element_text(color = "black", size = 11),
+        legend.text = element_text(color = "black", size = 12),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 9),
+        axis.ticks = element_line(color = "black", size = 1),
+        legend.position = "bottom", legend.key.width = unit(0.4,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA))
+
+
+ggsave("../../Figures/final/Supp1.pdf", plotsupp1, width = 13, height = 14)
+ggsave("../../Figures/final/Supp1.png", plotsupp1, width = 13, height = 14)
+```
+
+### Supp 2: slopes
+
+```{r}
+plotSlope <- dataTexampAll %>%
+  left_join(dataCont) %>%
+  filter(type == "predicted") %>%
+  mutate(type = NULL) %>%
+  group_by(Name) %>%
+ summarise(continent, week, sH = (H - lag(H))/(week - lag(week)), sL = (L - lag(L))/(week-lag(week))) %>%
+  ungroup() %>%
+  mutate(type = "slope") %>%
+select(Name, week, sH, sL, continent, type) %>%
+  rename(H = sH, L = sL) %>%
+  pivot_longer(cols = H:L,names_to = "SES", values_to = "PropV") %>%
+  arrange(continent) %>% mutate(Name = factor(Name, levels = levN)) %>%
+  mutate(SES = recode(SES, H = "High SES", L = "Low SES"), PropV = 100*PropV) %>%
+  ggplot(aes(week, PropV, col = continent)) + 
+  facet_wrap(~Name, scales = "free", ncol = 9) + 
+  scale_color_manual("Continent", values=cols) + 
+  geom_line(data=. %>% filter(type == "slope"),  
+            aes(linetype = SES), size = 0.7) + theme_classic() + 
+  scale_x_continuous("Week", breaks = seq(0,60,20), limits = c(0,65)) + 
+  scale_y_continuous("Change in vaccination coverage from previous week (%)",
+                     breaks = seq(0,8,4), limits = c(0,9)) + 
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 14),
+        legend.title = element_text(color = "black", size = 12),
+        legend.text = element_text(color = "black", size = 12),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 9),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "bottom", legend.key.width = unit(0.4,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA))
+
+
+plotSlope
+
+ggsave("../../Figures/final/supp2.pdf", plotSlope, width = 13, height = 12)
+
+```
+
+### Supp 3: difference over time
+
+```{r}
+
+ count4 <- dataTexampAll[c("Name", "H", "L", "week", "type")] %>%
+     group_by(Name) %>%
+     filter(week == max(week), type == "predicted") %>%
+     mutate(week = NULL) %>%
+     ungroup() %>% 
+   filter(H > L) %>%
+  distinct()
+
+## 81 locations, of which 69 have disparity = 85.2\%
+
+suppt3 <- dataTexampAll %>% left_join(dataCont) %>%
+  filter(type == "predicted") %>%
+  mutate(PropV = H-L) %>%
+  arrange(continent) %>% 
+  mutate(Name = factor(Name, levels = levN)) %>%
+  mutate(PropV = 100*PropV) %>% group_by(Name) %>%
+  ggplot(aes(week, PropV, col = continent)) + 
+  facet_wrap(~Name, scales = "free", ncol = 9) + 
+  scale_color_manual("Continent", values=cols) + 
+  theme_classic() + 
+  geom_line(aes(group = Name), size = 0.6) + 
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  scale_x_continuous("Week", breaks = seq(0,60,20), limits = c(0,65)) + 
+  scale_y_continuous("Disparity between high and low SES (%)") + # , limits = c(-20,40)) + 
+  ggtitle("Difference in vaccination rates over time") +
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+ theme(axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 14),
+        legend.title = element_text(color = "black", size = 15),
+        legend.text = element_text(color = "black", size = 12),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 9),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "bottom", legend.key.width = unit(0.4,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA))
+
+#suppt3  
+ggsave("../../Figures/final/supp3.pdf", suppt3, width = 13, height = 12)
+ggsave("../../Figures/final/supp3.png", suppt3, width = 13, height = 12)
+```
+
+### Supp 4: shapes over time
+
+```{r}
+suppt4 <- dataTexampAll %>% left_join(dataCont) %>%
+  pivot_longer(cols = H:L,names_to = "SES", values_to = "PropV") %>%
+  arrange(continent) %>% mutate(Name = factor(Name, levels = levN)) %>%
+  mutate(SES = recode(SES, H = "High SES", L = "Low SES"), PropV = 100*PropV) %>%
+  filter(type == "predicted") %>%
+  ggplot(aes(week, PropV, col = continent, linetype = SES, group = interaction(Name, SES))) + 
+  facet_wrap(~continent, scales = "free", nrow = 1) + 
+  scale_color_manual("Continent", values=cols) + 
+   theme_classic() + 
+  geom_line(aes(linetype = SES), size = 0.5) +
+  scale_x_continuous("Week", breaks = seq(0,60,20), limits = c(0,65)) + 
+  scale_y_continuous("Perc. vaccinated with at least one dose",
+                     breaks = seq(0,80,40), limits = c(0,99)) + 
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+  ggtitle("Vaccine coverage over time") + 
+  theme(axis.text = element_text(color = "black", size = 9),
+        axis.title = element_text(color = "black", size = 9),
+        legend.title = element_text(color = "black", size = 10),
+        legend.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 10),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "bottom", legend.key.width = unit(0.4,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA))
+suppt4
+ggsave("../../Figures/final/supp4.pdf", suppt4, width = 12, height = 3.5)
+ggsave("../../Figures/final/supp4.png", suppt4, width = 12, height = 3.5)
+```
+
+### Supp 5 Gini
+
+```{r}
+
+dataGini2 <- dataGini %>% rename(Name = country)
+
+hplotGini <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  ## add US and Brazil back in as whole countries
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group) %>%
+  left_join(dataGini2) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = gini, y = h)) + 
+  labs(title = "Functional response shape (k) and Gini coefficient") + theme_classic() +
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  geom_point(size = 3, col = "forestgreen", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter k") + xlab("Gini coefficient")
+hplotGini
+
+VmplotGini <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  ## add US and Brazil back in as whole countries
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, MaxVac, Group) %>%
+  left_join(dataGini2) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = gini, y = MaxVac)) + 
+  labs(title = "Maximum vaccinated (k) and Gini coefficient") +
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  theme_classic() +
+  geom_point(size = 3, col = "slategrey", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter Vm") + xlab("Gini coefficient")
+VmplotGini
+
+WhplotGini <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  ## add US and Brazil back in as whole countries
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, WVH, Group) %>%
+  left_join(dataGini2) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = gini, y = WVH)) + 
+  labs(title = "Halfway week (Wh) and Gini coefficient") + theme_classic() +
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  geom_point(size = 3, col = "orchid4", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter Wh") + xlab("Gini coefficient")
+WhplotGini
+
+```
+
+```{r}
+paramGini <- plot_grid(hplotGini, VmplotGini, WhplotGini, nrow = 1)
+paramGini
+```
+
+### Supp 5GDP
+
+```{r}
+dataGDP
+
+hplotGDP <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  ## add US and Brazil back in as whole countries
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group) %>%
+  left_join(dataGDP) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = log(GDP), y = h)) + 
+  labs(title = "Functional response shape (k) and GDP per capita") + theme_classic() +
+    stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  geom_point(size = 3, col = "forestgreen", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter k") + xlab("GDP per capita (log)")
+hplotGDP
+
+VmplotGDP <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, MaxVac, Group) %>%
+  left_join(dataGDP) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = log(GDP), y = MaxVac)) + 
+  labs(title = "Maximum vaccinated (Vm) and GDP per capita") + theme_classic() +
+    stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  geom_point(size = 3, col = "slategrey", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter Vm") + xlab("GDP per capita (log)")
+VmplotGDP
+
+
+WhplotGDP <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, WVH, Group) %>%
+  left_join(dataGDP) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% ggplot(aes(x = log(GDP), y = WVH)) + 
+  labs(title = "Halfway week (Wh) and GDP per capita") + theme_classic() +
+  geom_point(size = 3, col = "orchid4", alpha = 0.75) + 
+  geom_smooth(method = "lm", col = "darkgray", alpha  = 0.25) + 
+    stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("parameter Wh") + xlab("GDP per capita (log)")
+WhplotGDP
+
+```
+
+```{r}
+paramGDP <- plot_grid(hplotGDP, VmplotGDP, WhplotGDP, nrow = 1)
+paramGDP
+```
+
+
+
+
+```{r}
+hplotGDPdots <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group) %>%
+  left_join(dataGDP) %>% 
+  mutate(Group = gsub("1", "Sigmoidal", Group), 
+         Group = gsub("2", "Concave", Group)) %>% distinct() %>% 
+  mutate(Type = as_factor(Group)) %>% 
+  ggplot(aes(x=Type, y=log(GDP), col = Type, fill = Type)) + 
+  scale_color_manual(values = c("darkblue", "darkcyan")) + 
+  scale_fill_manual(values = c("darkblue", "darkcyan")) + 
+  geom_dotplot(binaxis='y', stackdir='center') + 
+   stat_compare_means(aes(y = log(GDP), x = Type, 
+                         label = ..p.signif..), 
+                     method = "wilcox.test", label.x=1.4,
+                     label.y.npc =  0.8, size=3.5, paired = FALSE) +
+  labs(title = "Group classification and GDP per capita") +
+  theme_classic() +
+  theme(axis.text = element_text(color = "black", size = 9),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10),
+        plot.title = element_text(colour = "black", size = 10)) +
+  ylab("GDP per capita (log)")
+hplotGDPdots
+```
+
+
+### Supp 5Continent
+
+```{r}
+hplotContdots <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group, continent) %>%
+  ggplot(aes(x=continent, y=h, color = "forestgreen", fill = "forestgreen")) + 
+ scale_color_manual(values = c("forestgreen")) + 
+scale_fill_manual(values = c("forestgreen")) + 
+  geom_dotplot(binaxis='y', stackdir='center') + theme_classic() +
+    stat_compare_means(aes(label = ..p.signif..), size = 3,
+              comparisons = list(c("Africa", "Asia"), 
+                                 c("Africa", "Europe"),
+                                 c("Africa", "North America"),
+                                 c("Africa", "South America"),
+                                 c("Asia", "Europe"),
+                                 c("Asia", "North America"),
+                                 c("Asia", "South America"),
+                                 c("Europe", "North America"),
+                                 c("Europe", "South America"),
+                                 c("North America", "South America")),
+              label.y = c(1,1.5,2,2.5,3,3.5,4,4.5,5,5.5), tip.length = 0.015)+
+  labs(title = "Functional response shape (k) and continent") +
+  ylab("parameter k") +
+  theme(axis.text = element_text(color = "black", size = 6),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10),
+        plot.title = element_text(colour = "black", size = 10))
+hplotContdots
+
+```
+
+
+### Supp 5measure
+
+```{r}
+measures <- dataT %>% select(Name, measure) %>% distinct() 
+## based on the table in the paper, and the Dictionary file and code, finish sorting measures into general categories
+## fine to use following approach as the non-specific measure names we are changing only apply to one country each in dataT
+measures$measure[measures$measure == "2020income"] <- "income"
+measures$measure[measures$measure == "psincome"] <- "income"
+measures$measure[measures$measure == "Socasst"] <- "social\nassistance"
+measures$measure[measures$measure == "MHI"] <- "income"
+measures$measure[measures$measure == "value"] <- "social\nassistance"
+measures$measure[measures$measure == "wealth5"] <- "GDP or wealth\nper capita"
+measures$measure[measures$measure == "meanIncome"] <- "income"
+measures$measure[measures$measure == "GISD_2012"] <- "multidim.\nSES index"
+measures$measure[measures$measure == "income deprivation rate"] <- "poverty"
+measures$measure[measures$measure == "GDPpc"] <- "GDP or wealth\nper capita"
+
+measures <- measures %>% 
+  mutate(Name = if_else(substr(Name, 1,6) == "United", "United States", Name), Name = if_else(substr(Name, 1,6) == "Brazil", "Brazil", Name)) %>%
+  distinct()
+
+hplotMeasdots <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group, continent) %>%
+  left_join(measures) %>%
+  ggplot(aes(x=measure, y=h, color = "forestgreen", fill = "forestgreen")) + 
+  scale_color_manual(values = c("forestgreen")) + 
+scale_fill_manual(values = c("forestgreen")) + 
+  geom_dotplot(binaxis='y', stackdir='center') +
+       stat_compare_means(aes(label = ..p.signif..), size = 3,
+              comparisons = list(c("GDP or wealth\nper capita", "income"), c("GDP or wealth\nper capita", "multidim.\nSES index"), c("GDP or wealth\nper capita", "poverty"),
+c("GDP or wealth\nper capita", "social\nassistance"),
+c("income", "multidim.\nSES index"),
+c("income", "poverty"),
+c("income", "social\nassistance"),
+c("multidim.\nSES index", "poverty"),
+c("multidim.\nSES index", "social\nassistance"),
+c("poverty", "social\nassistance")),
+label.y = c(1,1.5,2,2.5,3,3.5,4,4.5,5,5.5),
+               tip.length = 0.015) +
+  theme_classic() +
+  labs(title = "Functional response shape (k) and SES measure") +
+    ylab("parameter k") +
+  theme(axis.text = element_text(color = "black", size = 6),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10),
+        plot.title = element_text(colour = "black", size = 10))
+hplotMeasdots
+
+```
+
+```{r}
+
+plotDots <- plot_grid(hplotGDPdots, hplotContdots, hplotMeasdots, nrow = 1)
+
+plotfull5 <- plot_grid(paramGini, paramGDP, plotDots, nrow = 3, labels = c("A", "B", "C"))
+
+ggsave("../../Figures/final/supp5.pdf", plotfull5, width = 12, height = 10)
+ggsave("../../Figures/final/supp5.png", plotfull5, width = 12, height = 10)
+
+```
+
+### Supp 6: compare final %
+
+```{r}
+
+## check number of countries with H>L disparity
+
+count4 <- dataTstar[c("Name", "H", "L", "week", "continent", "numberLoc")] %>%
+  group_by(Name) %>%
+  filter(week == max(week)) %>%
+  mutate(week = NULL) %>%
+  ungroup() #%>% 
+  #  filter(H > L) %>%
+  # distinct()
+
+## 90 total, 75 disparity = 83.3\%
+
+levN <- unique(dataTstar %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+
+list4 <- count4 %>% select(Name, continent, numberLoc)
+
+plotsupp6 <- dataTloc %>%
+  mutate(Name = factor(Name, levels = levN)) %>% 
+  right_join(list4) %>% 
+  ggplot(aes(x=binvalue, y= vperc)) + 
+  geom_point(aes(x=binvalue,y = vperc, color = continent)) +
+  geom_violin(trim=T, fill = "lightgrey", 
+              width = 0.65, color = NA, alpha = 0.3) +
+  stat_compare_means(aes(y = vperc, x = binvalue, 
+                         label = ..p.signif..), 
+                     method = "wilcox.test", label.x=1.4,
+                     label.y.npc =  0.8, size=3.5, paired = FALSE) +
+  theme_minimal() +  scale_color_manual("Continent", values=cols) +
+  xlab("Socioeconomic status") + 
+  ylab("Vaccine coverage at end week of data (%)") + 
+  facet_wrap(~Name, scales = "free", ncol = 10) +
+  theme(axis.text = element_text(color = "black", size = 9),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", #aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 10),
+        strip.text = element_text(colour = 'black', size = 9))
+
+ggsave("../../Figures/final/Supp6.pdf", plotsupp6, width = 14, height = 15)
+```
+
+### Supp 7:
+#### Gini wealth and disparities
+
+```{r}
+
+levN2 <- unique(ContFull %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+deltaVac <- dataTexampAll %>% 
+  rbind(dataBrUS) %>%
+  left_join(ContFull) %>%
+  filter(type == "predicted") %>%
+  mutate(Delta = 100*(H-L)) %>% arrange(continent) %>% 
+  mutate(Name = factor(Name, levels = levN2)) %>% 
+  select(Country = Name, Week = week, Continent = continent, Delta) %>%
+  group_by(Country,Continent) %>% mutate(DeltaMax = max(Delta, na.rm = T)) %>%
+  ungroup() %>% group_by(Country,Continent) %>% 
+  filter(Week == max(Week, na.rm = T)) %>% ungroup() %>%
+  select(Country,Continent,DeltaEnd = Delta, DeltaMax)
+
+dataBrUSparam <- dataBrUSparam %>% 
+  left_join(paramsTableAll %>% select(Name, SES, Group) %>% distinct()) %>%
+  mutate(continent = "continent") %>%
+  mutate(continent = if_else(Name == "United States", "North America", continent)) %>%
+  mutate(continent = if_else(Name == "Brazil", "South America", continent))
+
+fitingDisp <- paramsTableAll %>% rbind(dataBrUSparam) %>%
+  select(SES, MaxVac,WVH,h, Country = Name, Continent = continent) %>%
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>% 
+  group_by(Country, Continent) %>% summarise(DeltaVmax = MaxVac_H - MaxVac_L, 
+            DeltaWh = WVH_L - WVH_H, DeltaK = h_H - h_L) %>% ungroup() %>%
+  mutate(overall1 = DeltaWh*DeltaVmax, overall2 = DeltaWh + DeltaVmax)
+
+
+plotFitingDisp <- fitingDisp %>% 
+  ggplot(aes(DeltaVmax, -DeltaWh, col = Continent)) + 
+  geom_point() + geom_label_repel(aes(label = Country)) + 
+  scale_color_manual("Continent", values = cols)
+
+
+datGiniC <- deltaVac %>% left_join(dataGini %>% rename(Country = country)) %>%
+  left_join(fitingDisp)
+datGiniCNA <- datGiniC %>% filter(if_any(everything(), is.na))
+
+
+supp7A <- datGiniC %>% 
+  mutate(Continent = fct_relevel(Continent, colOrder$continent)) %>%
+  filter(!is.na(gini), substring(Country,1,14) != "United States,", substring(Country, 1,7)!="Brazil,") %>% 
+  pivot_longer(cols = c(DeltaEnd,DeltaMax,DeltaVmax,DeltaWh,DeltaK), 
+               names_to = "Delta", values_to = "difference") %>%
+  ggplot(aes(x = gini, y = difference)) + xlab("Gini index") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Maximum disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) + theme_classic() +
+  geom_point(aes(col = Continent), size = 2, alpha = 0.5) + 
+  facet_wrap(~Delta, scales = "free", nrow = 1) + 
+  scale_color_manual("Continent", values = cols) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 10))
+supp7A
+
+my_colors <- rev(met.brewer("Egypt", 5))[c(3,4:5)]
+
+supp7B <- datGiniC %>% 
+  mutate(Continent = fct_relevel(Continent, colOrder$continent)) %>%
+  filter(!is.na(gini), substring(Country,1,14) == "United States," | substring(Country, 1,7) == "Brazil,") %>% 
+  pivot_longer(cols = c(DeltaEnd,DeltaMax,DeltaVmax,DeltaWh,DeltaK), 
+               names_to = "Delta", values_to = "difference") %>%
+  ggplot(aes(x = gini, y = difference)) + xlab("Gini index") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Maximum disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) + theme_classic() +
+  geom_point(aes(col = Continent), size = 2, alpha = 0.5) + 
+  facet_wrap(~Delta, scales = "free", nrow = 1) + 
+  scale_color_manual("Continent", values = my_colors) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(),
+        strip.text = element_text(colour = 'black', size = 10))
+supp7B
+
+supp7 <- plot_grid(supp7A, supp7B, nrow = 2, labels = "AUTO")
+
+ggsave("../../Figures/final/Supp7.pdf", supp7, width = 16, height = 8)
+ggsave("../../Figures/final/Supp7.png", supp7, width = 16, height = 8)
+```
+
+
+#### Gini vaccination
+
+```{r}
+
+levN2 <- unique(ContFull %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+GiniVax <- LorenzData %>% select(country, Gini) %>% distinct()
+
+dataBrUSparam <- dataBrUSparam %>% 
+  left_join(paramsTableAll %>% select(Name, SES, Group) %>% distinct()) %>%
+  mutate(continent = "continent") %>%
+  mutate(continent = if_else(Name == "United States", "North America", continent)) %>%
+  mutate(continent = if_else(Name == "Brazil", "South America", continent))
+
+fitingDisp <- paramsTableAll %>% rbind(dataBrUSparam) %>%
+  select(SES, MaxVac,WVH,h, Country = Name, Continent = continent) %>%
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>% 
+  group_by(Country, Continent) %>% summarise(DeltaVmax = MaxVac_H - MaxVac_L, 
+            DeltaWh = WVH_L - WVH_H, DeltaK = h_H - h_L) %>% ungroup() %>%
+  mutate(overall1 = DeltaWh*DeltaVmax, overall2 = DeltaWh + DeltaVmax)
+
+
+##plotFitingDisp <- fitingDisp %>% 
+##  ggplot(aes(DeltaVmax, -DeltaWh, col = Continent)) + 
+ ## geom_point() + geom_label_repel(aes(label = Country)) + 
+ ## scale_color_manual("Continent", values = cols)
+
+
+datGiniV <- deltaVac %>% left_join(GiniVax %>% rename(Country = country, gini = Gini)) %>% left_join(fitingDisp)
+datGiniVNA <- datGiniV %>% filter(if_any(everything(), is.na))
+
+
+supp7AVax <- datGiniV %>% 
+  mutate(Continent = fct_relevel(Continent, colOrder$continent)) %>%
+  filter(!is.na(gini), substring(Country,1,14) != "United States," & substring(Country,1,6) != "Brazil") %>% 
+  pivot_longer(cols = c(DeltaEnd,DeltaMax,DeltaVmax,DeltaWh,DeltaK), 
+               names_to = "Delta", values_to = "difference") %>%
+  ggplot(aes(x = 100*gini, y = difference)) + xlab("Gini (vaccination)") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Maximum disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) + theme_classic() +
+  geom_point(aes(col = Continent), size = 2, alpha = 0.5) + 
+  facet_wrap(~Delta, scales = "free", nrow = 1) + 
+  scale_color_manual("Continent", values = cols) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 10))
+supp7AVax
+
+my_colors <- rev(met.brewer("Egypt", 5))[c(3,4:5)]
+
+supp7BVax <- datGiniV %>% 
+  mutate(Continent = fct_relevel(Continent, colOrder$continent)) %>%
+  filter(!is.na(gini), substring(Country,1,14) == "United States," | substring(Country,1,6) == "Brazil") %>% 
+  pivot_longer(cols = c(DeltaEnd,DeltaMax,DeltaVmax,DeltaWh,DeltaK), 
+               names_to = "Delta", values_to = "difference") %>%
+  ggplot(aes(x = 100*gini, y = difference)) + xlab("Gini (vaccination)") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Maximum disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) + theme_classic() +
+  geom_point(aes(col = Continent), size = 2, alpha = 0.5) + 
+  facet_wrap(~Delta, scales = "free", nrow = 1) + 
+  scale_color_manual("Continent", values = my_colors) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 10))
+supp7BVax
+
+supp7Vax <- plot_grid(supp7AVax, supp7BVax, nrow = 2, labels = "AUTO")
+
+ggsave("../../Figures/final/SuppGiniVax.pdf", supp7Vax, width = 16, height = 8)
+ggsave("../../Figures/final/SuppGiniVax.png", supp7Vax, width = 16, height = 8)
+```
+
+
+#### Compare two Gini coefficients
+```{r}
+
+levN2 <- unique(ContFull %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+GiniComp <- GiniVax %>% inner_join(datGiniC %>% select(Country, gini, Continent) %>% rename(country = Country)) %>% mutate(giniWealth = gini, gini = NULL) %>% rename(giniVax = Gini)
+
+GiniCompPlot <- GiniComp %>%
+  ggplot(aes(x = giniWealth, y = 100*giniVax)) + 
+  geom_point(aes(col = Continent), size = 2, alpha = 0.5) + 
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) +
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=2.5) +
+    scale_color_manual("Continent", values = cols) + 
+  xlab("Gini index") + ylab("Gini coefficient (vaccination)") + ggtitle("Gini Comparison") + theme_minimal()
+GiniCompPlot
+
+ggsave("../../Figures/final/SuppGiniComp.pdf", GiniCompPlot, width = 7, height = 5)
+ggsave("../../Figures/final/SuppGiniComp.png", GiniCompPlot, width = 7, height = 5)
+
+```
+
+
+### Supp 8: Lorenz Curves
+
+```{r}
+LorenzDataUnique <- LorenzData %>% select(country, Gini) %>% 
+  distinct() %>% arrange(Gini)
+
+LorenzData2 <- LorenzData %>% 
+  rename(Name = country) %>%
+  left_join(dataCont) %>%
+  mutate(Gini = paste(Name,", ", "\nGini = ", round(Gini, 2), sep = ""))
+
+plot8<- LorenzData2 %>% 
+  arrange(continent) %>% mutate(Name = factor(Name, levels = levN)) %>%
+  ggplot() +
+  geom_point(aes(x=100*p, y=100*L), size= 0.5, alpha = 0.3) +
+  geom_line(aes(x=100*p, y=100*L, col = continent), size = 1) +
+  scale_color_manual("Continent", values=cols) +
+  scale_x_continuous(name="Cumulative share of population (%)", limits=c(0,100), breaks = c(0,30,60,90)) + 
+  scale_y_continuous(name="Cumulative share of vaccinations (%)", limits=c(0,100), breaks = c(0,30,60,90)) +
+  geom_abline(size = 0.3) + 
+  facet_wrap(~Gini, ncol = 9, scales = "free") + theme_minimal() + 
+    theme(axis.line = element_line(color = "black", size = 0.3),
+          axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 12),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 12),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 9))
+
+Ginirange <- LorenzData %>% 
+  select(Gini) %>%
+  mutate(Ginimax = max(Gini), Ginimin = min(Gini))
+Ginicountries <- LorenzData %>%
+  filter(Gini == max(Gini) | Gini == min(Gini))
+
+ggsave("../../Figures/final/Supp8.pdf", plot8, width = 14, height = 14)
+```
+
+
+### Supp 12: model compare k values
+
+```{r}
+
+
+pre_vaccine_Inf <- dataRefSupp %>% filter(time == 210) %>% 
+  filter(type == "No vaccination") %>% summarise(RefInf = sum(CumInf))
+pre_vaccine_Death <- data4C %>% filter(type == "No vaccination") %>%
+  filter(time == 210) %>% summarise(RefDeath = sum(CumDeath))
+
+
+BaseKInf <- dataRefSupp %>% filter(type == "No vaccination") %>%
+  filter(time == max(time)) %>% summarise(BaseInf = sum(CumInf) - pre_vaccine_Inf$RefInf)
+BaseKDeath <- data4C %>% filter(type == "No vaccination") %>%
+  filter(time == max(time)) %>% summarise(BaseDeath = sum(CumDeath)- pre_vaccine_Death$RefDeath)
+
+
+
+dataGridSupp2 <- dataGridSupp %>% 
+  mutate(Deaths_Averted = 100*(BaseKDeath$BaseDeath - (Deaths-pre_vaccine_Death$RefDeath))/(BaseKDeath$BaseDeath),
+         Infections_Averted = 100*(BaseKInf$BaseInf - (Infections-pre_vaccine_Inf$RefInf))/BaseKInf$BaseInf)
+
+plotSupp_CasesD <- dataGridSupp2 %>% filter(strat=="Disparity") %>%
+  ggplot(aes(x = Wh_H, y = 100*Vm_H)) + theme_minimal() +  
+  geom_tile(aes(fill = Infections_Averted), color = NA) +   
+  scale_fill_stepsn("Cases averted (%)",n.breaks = 10, 
+                    colours = viridis::magma(10)) + 
+  scale_y_continuous("Potential maximum\nvaccinated (Vm) (%)", 
+                     expand = c(0,0)) + 
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)", 
+                     expand = c(0,0)) +
+  facet_wrap(~type, scales = "free", nrow = 1) + 
+  ggtitle("Cases") +
+  theme(axis.text = element_text(color = "black", size = 12),
+        axis.title = element_text(color = "black", size = 14),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.4,"cm"),
+        legend.key.height =unit(0.8,"cm"),
+        plot.title = element_text(colour = "black", size = 17, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 15),
+        legend.title = element_text(colour = "black", size = 12),
+        legend.text = element_text(colour = "black", size = 10),
+        strip.text = element_text(colour = "black", size = 15, hjust = 0),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+
+### Deaths disparity
+plotSupp_DeathsD <- dataGridSupp2 %>% filter(strat=="Disparity") %>%
+  ggplot(aes(x = Wh_H, y = 100*Vm_H)) + 
+  geom_tile(aes(fill=Deaths_Averted), color=NA) + 
+  scale_fill_stepsn("Deaths averted (%)", 
+                    n.breaks = 9, colours = viridis::viridis(9)) + 
+  scale_y_continuous("Potential maximum\nvaccinated (Vm) (%)", 
+                     expand = c(0,0)) + theme_minimal() +  
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)", 
+                     expand = c(0,0)) + ggtitle("Disparity") +
+  labs(title = "Deaths") +
+  facet_wrap(~type, scales = "free", nrow = 1) + 
+  theme(axis.text = element_text(color = "black", size = 12),
+        axis.title = element_text(color = "black", size = 14),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.4,"cm"),
+        legend.key.height =unit(0.8,"cm"),
+        plot.title = element_text(colour = "black", size = 17, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 15),
+        legend.title = element_text(colour = "black", size = 12),
+        legend.text = element_text(colour = "black", size = 10),
+        strip.text = element_text(colour = "black", size = 15, hjust = 0),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+
+plotSuppModel <- plot_grid(plotSupp_CasesD, plotSupp_DeathsD, rel_widths = c(1, 1.01), labels = c("A", "B"), nrow = 2, label_size = 18)
+
+ggsave("../../Figures/final/supp_model.pdf", plotSuppModel, width = 16, height = 7)
+ggsave("../../Figures/final/supp_model.png", plotSuppModel, width = 16, height = 7)
+```
+
+
+### Supp 13: Parameter plots
+
+### (B) parameter plots
+
+```{r}
+
+hplotSupp <-  paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, h, Group) %>% 
+  distinct() %>% pivot_wider(names_from = SES, values_from = h) %>% 
+  mutate(Group = as_factor(Group)) %>% ggplot(aes(x = H, y = L)) + 
+  labs(title = "Shape of functional response (k)") + 
+  geom_density_2d(colour = "gray90",bins = 5, size = 0.3) + 
+  geom_abline(intercept = 0, slope = 1, size = 0.75, lty=2, col = "gray70") + 
+  geom_point(aes(col = Group), size = 2.5, alpha = 0.5) + theme_classic() +
+#  geom_label(aes(x=1.56,y=1.56, label = "X"), col = "darkcyan", size = 2,
+ #            label.padding = unit(0.08, "lines"),fontface = "bold") +
+#  geom_label(aes(x=3.24,y=3.24, label = "X"), col = "darkblue", size = 2,
+ #            label.padding = unit(0.08, "lines"),fontface = "bold") + 
+  scale_color_manual(values = c("darkblue", "darkcyan")) + coord_fixed() + 
+  scale_x_continuous(" ", expand = c(0,0), limits = c(0,5.62)) + 
+  scale_y_continuous("Low SES", expand = c(0,0), limits = c(0,5.62)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10))
+
+WVHplotSupp <- paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, WVH, Group) %>% 
+  distinct() %>% pivot_wider(names_from = SES, values_from = WVH)  %>%
+  mutate(Group = as_factor(Group)) %>% ggplot(aes(x = H, y = L)) + 
+  geom_density_2d(colour = "gray90", bins = 5, size = 0.3) + 
+  labs(title = "Week at which the rate is half of Vm (Wh) ") + 
+  geom_abline(intercept = 0, slope = 1, size = 0.75, lty=2, col = "gray70") + 
+  geom_point(aes(col = Group), size = 2.5, alpha = 0.5) + theme_classic() +
+#  geom_label(aes(x=14,y=15, label = "X"), col = "darkcyan", size = 2,
+ #            label.padding = unit(0.08, "lines"),fontface = "bold") +
+#  geom_label(aes(x=23,y=24, label = "X"), col = "darkblue", size = 2,
+#             label.padding = unit(0.08, "lines"),fontface = "bold") + 
+  scale_color_manual(values = c("darkblue", "darkcyan")) + coord_fixed() + 
+  scale_x_continuous("High SES", expand = c(0,0), limits = c(0,36),
+                     breaks = seq(0,36,8)) + 
+  scale_y_continuous(" ", expand = c(0,0), limits = c(0,36),
+                     breaks = seq(0,36,8)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 10),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = 0)),
+        plot.title = element_text(colour = "black", size = 9.25))
+
+MaxplotSupp <- paramsTableAll %>%
+  filter(substr(Name, 1,6)!= "United" & substr(Name, 1,6)!= "Brazil") %>%
+  rbind(paramsTableAllSupp) %>%
+  select(Name, SES, MaxVac, Group) %>% 
+  distinct() %>% pivot_wider(names_from = SES, values_from = MaxVac) %>%
+  mutate(Group = as_factor(Group)) %>% ggplot(aes(x = 100*H, y = 100*L)) +
+  geom_density_2d(colour = "gray90", bins = 5, size = 0.3) + coord_fixed() + 
+  theme_classic() + labs(title = "Potential maximum vaccinated (Vm)") + 
+  geom_abline(intercept = 0, slope = 1, size = 0.75, lty=2, col = "gray70") + 
+  geom_point(aes(col = Group), size = 2.5, alpha = 0.5) + 
+#  geom_label(aes(x=83,y=76, label = "X"), col = "darkcyan", size = 2,
+ #            label.padding = unit(0.08, "lines"),fontface = "bold") +
+#  geom_label(aes(x=89,y=82, label = "X"), col = "darkblue", size = 2,
+#             label.padding = unit(0.08, "lines"),fontface = "bold") + 
+  scale_color_manual(values = c("darkblue", "darkcyan")) + 
+  scale_x_continuous(" ", expand = c(0,0), limits = c(40,105),
+                     breaks = seq(from=40,to=100,by = 15)) + 
+  scale_y_continuous(" ", expand = c(0,0), limits = c(40,105),
+                     breaks = seq(from=40,to=100,by = 15)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = 0)),
+        plot.title = element_text(colour = "black", size = 10),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 10),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA))
+
+plot3BSupp <- plot_grid(hplotSupp, NULL, WVHplotSupp, NULL, MaxplotSupp, align = "hv", 
+                    nrow = 1, rel_widths = c(1, -0.02, 1, -0.02, 1))
+
+plot3BSupp
+
+ggsave("../../Figures/final/3BSupp.pdf", plot3BSupp, width = 9, height = 3)
+ggsave("../../Figures/final/3BSupp.png", plot3BSupp, width = 9, height = 3)
+```
+
+
+### Supp 14: Bar Plot
+```{r}
+
+SuppBarRatio <- dataTstar %>% left_join(dataCont) %>% select(continent, Name, week, H, L) %>%
+  filter(L>0.005) %>%
+  mutate(ratio = H/L) %>%
+  group_by(Name) %>% 
+  mutate(RatioMax = max(ratio, na.rm = T), RatioAverage = mean(ratio, na.rm = T)) %>%
+  filter(week == max(week)) %>%
+  rename(RatioFinal = ratio) %>%
+  ungroup() %>% 
+  pivot_longer(6:8, names_to = "Calc", values_to = "value")
+
+SuppBarDiff <- dataTstar %>% left_join(dataCont) %>% select(continent, Name, week, H, L) %>%
+  mutate(diff = 100*(H-L)) %>%
+  group_by(Name) %>% 
+  mutate(DeltaMax= max(diff, na.rm = T), DeltaAverage= mean(diff, na.rm = T)) %>%
+  filter(week == max(week)) %>%
+  rename(DeltaFinal = diff) %>%
+  ungroup() %>% 
+  pivot_longer(6:8, names_to = "Calc", values_to = "value")
+
+levN <- unique(dataTstar %>% arrange(continent) %>% select(Name)) %>%
+  unlist() %>% as.vector()
+cols <- rev(met.brewer("Egypt", 5))[c(5,1:4)]
+
+
+equityDiff <- SuppBarDiff %>% mutate(absDiff = abs(value)) %>% 
+  arrange(absDiff)
+equityDiffAVG <- equityDiff %>% filter(Calc == "DeltaAverage")
+equityDiffFinal <- equityDiff %>% filter(Calc == "DeltaFinal")
+equityDiffMax <- equityDiff %>% filter(Calc == "DeltaMax")
+
+equityRatio <- SuppBarRatio %>% mutate(absRatio = abs(value -1)) %>% 
+  arrange(absRatio)
+equityRatioAVG <- equityRatio %>% filter(Calc == "RatioAverage")
+equityRatioFinal <- equityRatio %>% filter(Calc == "RatioFinal")
+equityRatioMax <- equityRatio %>% filter(Calc == "RatioMax")
+
+
+resolution <- dataTstar %>% select(country, state, numberLoc) %>% distinct() %>% 
+  mutate(Name = case_when(is.na(state) ~ country, TRUE ~ paste(country, state, sep = ", "))) %>% rename(resolution = numberLoc)
+
+SESDiff <- SuppBarDiff %>%
+  select(Name, continent, Calc, value) %>%
+  inner_join(resolution) %>%
+  select(Name, continent, Calc, value, resolution) %>%
+  mutate(Res1 = if_else(
+    resolution >= 100, "100 or more locations", "null"
+  ),
+  Res2 = if_else(
+    Res1 == "null" & resolution <= 20, "12-20 locations", Res1
+  ),
+    Res = if_else(
+    Res2 == "null", "21-99 locations", Res2
+  )
+  )
+
+SESRat <- SuppBarRatio %>%
+  select(Name, continent, Calc, value) %>%
+  inner_join(resolution) %>%
+  select(Name, continent, Calc, value, resolution) %>%
+  mutate(Res1 = if_else(
+    resolution >= 100, "100 or more locations", "null"
+  ),
+  Res2 = if_else(
+    Res1 == "null" & resolution <= 20, "12-20 locations", Res1
+  ),
+    Res = if_else(
+    Res2 == "null", "21-99 locations", Res2
+  )
+  )
+
+#SESDiff_plot <- SESDiff %>%
+  #ggplot(aes(x=resolution, y=DeltaFinal)) + 
+  #geom_dotplot(binaxis='y', stackdir='center')
+#SESDiff_plot
+
+
+SESDiff_corr <- SESDiff %>%
+  mutate(Continent = fct_relevel(continent, colOrder$continent)) %>%
+  filter(Name != "United States", Name !="Brazil") %>% 
+  ggplot(aes(x = resolution, y = value)) + xlab("Subnational locations") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) +
+  theme_classic() +
+  geom_point(aes(color = Res)) +
+  scale_color_manual("Resolution group", values = c("#253494","#2c7fb8","#41b6c4")) + 
+  facet_wrap(~Calc, scales = "free", nrow = 1) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 10)) + 
+  ggtitle("Difference (H-L)")
+SESDiff_corr
+
+
+SESRat_corr <- SESRat %>%
+  mutate(Continent = fct_relevel(continent, colOrder$continent)) %>%
+  filter(Name != "United States", Name !="Brazil") %>% 
+  ggplot(aes(x = resolution, y = value)) + xlab("Subnational locations") + 
+  stat_cor(label.y.npc="top", label.x.npc = "left", method = "pearson",size=3.5) +
+  ylab("Disparity between low and high SES (%)") +
+  geom_smooth(method="lm", linetype = 2, size = 0.5, 
+              col = "black", alpha = 0.25) +
+  theme_classic() +
+  geom_point(aes(color = Res)) +
+  scale_color_manual("Resolution group", values = c("#253494","#2c7fb8","#41b6c4")) + 
+  facet_wrap(~Calc, scales = "free", nrow = 1) + 
+  theme(axis.text = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = 'black', size = 10)) +
+    ggtitle("Ratio (H/L)")
+SESRat_corr
+
+ses_corr <- plot_grid(SESDiff_corr, SESRat_corr, rows = 2, labels = c("A","B"))
+
+ggsave("../../Figures/final/SuppDiffCorr_res.pdf", ses_corr, width = 15, height = 8)
+ggsave("../../Figures/final/SuppDiffCorr_res.png", ses_corr, width = 15, height = 8)
+
+
+SuppBarFinal1 <- rbind(SuppBarDiff, SuppBarRatio) %>%
+  mutate(Name = reorder_within(Name,value, Calc)) %>%
+  filter(substr(Calc, 1,5) == "Ratio") %>%
+  ggplot() + geom_vline(xintercept = 1, linetype = "dotted") + 
+  facet_wrap(~Calc, scales = "free", ncol = 3)  + 
+  geom_bar(aes(x = value, y = Name, fill = continent), stat="identity") +
+  scale_color_manual("Continent", values=cols) + 
+  scale_fill_manual("Continent", values=cols) +
+  theme_classic() + 
+  scale_y_reordered() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5, size = 20),
+        axis.text = element_text(color = "black", size = 20), 
+        plot.title = element_text(colour = "black", size = 25), 
+        axis.title.x = element_text(color = "black", size = 20),
+        axis.title.y = element_text(color = "black", size = 20), 
+        strip.background = element_rect(colour=NA, fill=NA),
+        strip.text = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20), 
+        legend.title = element_text(color = "black", size = 20), 
+) + 
+  ggtitle("Disparities in Observed Data (Ratio)")+
+  xlab("disparity")
+SuppBarFinal1
+
+
+SuppBarFinal2 <- rbind(SuppBarDiff, SuppBarRatio) %>%
+  mutate(Name = reorder_within(Name,value, Calc)) %>%
+  filter(substr(Calc, 1,5) != "Ratio") %>%
+  ggplot() + geom_vline(xintercept = 0, linetype = "dotted") + 
+  facet_wrap(~Calc, scales = "free", ncol = 3)  + 
+  geom_bar(aes(x = value, y = Name, fill = continent), stat="identity") +
+  scale_color_manual("Continent", values=cols) + 
+  scale_fill_manual("Continent", values=cols) +
+  theme_classic() +
+  scale_y_reordered() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5, size = 20),
+        axis.text = element_text(color = "black", size = 20), 
+        plot.title = element_text(colour = "black", size = 25), 
+        axis.title.x = element_text(color = "black", size = 20),
+        axis.title.y = element_text(color = "black", size = 20), 
+        strip.background = element_rect(colour=NA, fill=NA),
+        strip.text = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20), 
+        legend.title = element_text(color = "black", size = 20), 
+) + 
+  ggtitle("Disparities in Observed Data (Difference)")+
+  xlab("disparity")
+SuppBarFinal2
+
+ggsave("../../Figures/final/SuppBarFinal1.pdf", SuppBarFinal1, width = 20, height = 25)
+ggsave("../../Figures/final/SuppBarFinal1.png", SuppBarFinal1, width = 20, height = 25)
+
+
+ggsave("../../Figures/final/SuppBarFinal2.pdf", SuppBarFinal2, width = 20, height = 25)
+ggsave("../../Figures/final/SuppBarFinal2.png", SuppBarFinal2, width = 20, height = 25)
+
+
+
+
+
+SESRat
+
+SuppBarSpar <- SESRat %>%
+  mutate(Name = reorder_within(Name,value, Calc)) %>%
+  filter(substr(Calc, 1,5) == "Ratio") %>%
+  ggplot() + geom_vline(xintercept = 1, linetype = "dotted") + 
+  facet_wrap(~Calc, scales = "free", ncol = 3)  + 
+  geom_bar(aes(x = value, y = Name, fill = Res), stat="identity") +
+  theme_classic() + 
+  scale_y_reordered() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5, size = 20),
+        axis.text = element_text(color = "black", size = 20), 
+        plot.title = element_text(colour = "black", size = 25), 
+        axis.title.x = element_text(color = "black", size = 20),
+        axis.title.y = element_text(color = "black", size = 20), 
+        strip.background = element_rect(colour=NA, fill=NA),
+        strip.text = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20), 
+        legend.title = element_text(color = "black", size = 20), 
+) + 
+  ggtitle("Disparities in Observed Data (Ratio)")+
+  xlab("disparity")
+SuppBarSpar
+ggsave("../../Figures/final/SuppBarSpat1.png", SuppBarSpar, width = 20, height = 25)
+
+SuppBarSpar <- SESDiff %>%
+  mutate(Name = reorder_within(Name,value, Calc)) %>%
+  filter(substr(Calc, 1,5) != "Ratio") %>%
+  ggplot() + geom_vline(xintercept = 1, linetype = "dotted") + 
+  facet_wrap(~Calc, scales = "free", ncol = 3)  + 
+  geom_bar(aes(x = value, y = Name, fill = Res), stat="identity") +
+  theme_classic() + 
+  scale_y_reordered() +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5, size = 20),
+        axis.text = element_text(color = "black", size = 20), 
+        plot.title = element_text(colour = "black", size = 25), 
+        axis.title.x = element_text(color = "black", size = 20),
+        axis.title.y = element_text(color = "black", size = 20), 
+        strip.background = element_rect(colour=NA, fill=NA),
+        strip.text = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20), 
+        legend.title = element_text(color = "black", size = 20), 
+) + 
+  ggtitle("Disparities in Observed Data (Delta)")+
+  xlab("disparity")
+SuppBarSpar
+ggsave("../../Figures/final/SuppBarSpat2.png", SuppBarSpar, width = 20, height = 25)
+
+```
+
+
+### Supp 18: Distribution of percentiles
+
+
+```{r}
+
+paramsTableStats <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Group, Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(Group = recode(Group, `1` = "Sigmoidal", `2` = "Concave"),
+         deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(100*deltaVm, digits = 0)) %>% 
+  rename(k = deltak, Vm = deltaVm, Wh = deltaWh)
+
+paramsTableStatsNoGroup <- paramsTableAll %>% ## group 2 is concave
+  pivot_wider(names_from = SES, values_from = c(MaxVac,WVH,h)) %>%
+  mutate(deltaVm = MaxVac_H - MaxVac_L, deltaWh = WVH_L - WVH_H, 
+         deltak = h_H - h_L) %>% select(Group, deltaVm:deltak) %>%
+  pivot_longer(cols = deltaVm:deltak, names_to = "Param") %>% 
+  group_by(Param) %>%  summarise(avg = mean(value), 
+            q95 = quantile(value, 0.95)) %>% ungroup() %>% 
+  pivot_longer(cols = avg:q95, names_to = "Stat") %>%
+  pivot_wider(names_from = Param, values_from = value) %>%
+  mutate(deltaWh = round(deltaWh, digits = 0), 
+         deltaVm = round(100*deltaVm, digits = 0)) %>%
+  mutate(Group = "All Groups") %>% 
+  select(Group, Stat, deltak, deltaVm, deltaWh) %>%
+  rename(k = deltak, Vm = deltaVm, Wh = deltaWh)
+
+paramsTableStats <- rbind(paramsTableStats, paramsTableStatsNoGroup) %>% pivot_longer(3:5, names_to = "param", values_to = "value") %>% 
+  mutate(Stat = gsub("avg", "average", Stat),
+         Stat = gsub("q95", "95%", Stat))
+
+StatParamsAll <- paramsTableAll %>% 
+  rename(k =h, Vm = MaxVac, Wh = WVH) %>%
+  mutate(Vm = 100*Vm, Wh = -Wh) %>%
+  pivot_longer(3:5, names_to = "param", values_to = "value") %>%
+  pivot_wider(names_from = "SES", values_from = "value") %>%
+  mutate(disparity = H-L) %>%
+  mutate(Group = gsub(1, "Sigmoidal", Group), Group = gsub(2, "Concave", Group)) %>% mutate(Group = "All Groups")
+
+plotParams <- paramsTableAll %>% 
+    rename(k =h, Vm = MaxVac, Wh = WVH) %>%
+    mutate(Vm = 100*Vm, Wh = -Wh) %>%
+  pivot_longer(3:5, names_to = "param", values_to = "value") %>%
+  pivot_wider(names_from = "SES", values_from = "value") %>%
+  mutate(disparity = H-L) %>%
+  mutate(Group = gsub(1, "Sigmoidal", Group), Group = gsub(2, "Concave", Group)) %>% rbind(StatParamsAll) %>%
+  ggplot(aes(x=Group, y=disparity)) + 
+  geom_violin(aes(col = Group, fill = Group), alpha = 0.5) +
+  scale_color_manual("Type", values = c("#5ec962","darkcyan", "darkblue"))+
+    scale_fill_manual("Type", values = c("#5ec962","darkcyan", "darkblue"))+
+  geom_point(size = 0.5, color = "white", alpha = 0.7) + 
+  geom_point(data = paramsTableStats %>% rename(Statistic = Stat), aes(x = Group, y = value, shape = Statistic), color = "black", size = 2) +
+  scale_shape_manual(values=c(15, 17))+
+    guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  ggtitle("Distribution of parameter disparity") +
+  theme_minimal() + ylab("Disparity")+
+  facet_wrap(~param, scales = "free") +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 11),
+        plot.title = element_text(colour = "black", size = 12),
+        strip.text = element_text(colour = "black", size = 12),
+        panel.grid = element_blank()) 
+plotParams
+
+ggsave("../../Figures/final/SuppParamDisp.pdf", plotParams, width = 10, height = 5)
+ggsave("../../Figures/final/SuppParamDisp.png", plotParams, width = 10, height = 5)
+
+```
+
+## Supp 19: Deaths averted
+
+
+### 4A: Daily vaccination since t = 0 
+
+```{r}
+plot4A <- data4A %>% 
+  mutate(Vac = 100*value, SES = recode(SES, H = "High SES", L = "Low SES"), 
+         Type = recode(Type,  S = "Sigmoidal", C ="Concave")) %>% 
+  select(time, Vac, SES, Type) %>% ggplot() + 
+  geom_ribbon(data=. %>% select(time, Type, SES, Vac) %>% 
+        distinct() %>% pivot_wider(names_from = SES, values_from = Vac),
+        aes(x = time/30, ymin = `Low SES`, ymax = `High SES`, 
+            group = Type, fill = Type), alpha = 0.1, color = NA) + 
+  theme_minimal() + ggtitle("Daily vaccination rates") + 
+  geom_line(aes(x=time/30, y = Vac, col = Type, linetype = SES), size = 1) + 
+  scale_color_manual("Type", values = c("darkcyan", "darkblue")) + 
+  scale_fill_manual("Type", values = c("darkcyan", "darkblue")) + 
+  scale_linetype_manual(name = NULL, values = c("High SES" = 1, "Low SES" = 2)) + 
+  guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  scale_x_continuous("Time (months)", breaks = seq(0,14,2), 
+                     expand = c(0,0), limits = c(-0.1,14.2)) + 
+  scale_y_continuous("Population vaccinated (%)", limits = c(0,0.55),
+                     breaks = seq(0,1,0.1), expand = c(0,0)) +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 11),
+        plot.title = element_text(colour = "black", size = 12),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 8),
+        legend.key.height = unit(0.4,"cm"),
+        legend.key.width = unit(0.8,"cm"),
+        legend.spacing = unit(-0.5, 'cm'),
+        legend.justification = c(1, 1.01), legend.position = c(1, 1.01),
+        legend.box.background = element_rect(fill= NA, colour = NA),
+        panel.grid = element_blank()) 
+plot4A
+```
+
+### 4B. Vaccination at t0 
+
+```{r}
+plot4B <- data4B %>% mutate(SES = recode(SES, H = "High SES", L = "Low SES"),
+      type = fct_relevel(type, c("No vaccination","Concave","Sigmoidal"))) %>%
+  ggplot() + theme_minimal() + 
+  geom_line(aes(x=time/30, y = CumInf, col=type, linetype=SES), size=1) + 
+  scale_color_manual("Type", values = c("#945196", "darkcyan", "darkblue")) + 
+  scale_fill_manual("Type", values = c("#945196", "darkcyan", "darkblue")) + 
+  scale_linetype_manual(name = NULL, values = c("High SES" = 1, "Low SES" = 2)) + 
+  ggtitle("Vaccination started immediately") + #guides(linetype = "none") + 
+  guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  geom_vline(xintercept = 0.03, lty=3) + 
+  scale_x_continuous("Time (months)", breaks = seq(0,14,2), 
+                     expand = c(0,0), limits = c(-0.1,14.2)) + 
+  scale_y_continuous("Cumulative infections", limits = c(0,2e+7), 
+                     expand = c(0,0), 
+                     labels = unit_format(unit = "M", scale = 1e-6)) +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 11),
+        axis.title = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 13),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 9),
+        legend.key.height = unit(0.35,"cm"),
+        legend.key.width = unit(0.8,"cm"),
+        legend.spacing = unit(-0.4, 'cm'),
+        legend.justification = c(1, 1), 
+        legend.position = c(0.45, 1.075),
+        legend.box.background = element_rect(fill= NA, colour = NA),
+        panel.grid = element_blank()) 
+plot4B
+```
+
+
+### 4C. Vaccination at t=211
+
+```{r}
+plot4C <- data4C %>% 
+  mutate(type = fct_relevel(type, 
+        c("No vaccination","Concave","Sigmoidal"))) %>%
+  ggplot() + theme_minimal() + ggtitle("Vaccination started after 7 months") +
+  geom_line(aes(x=time/30, y = CumInf, col = type, lty = SES), size = 1) + 
+  scale_color_manual("Type", values = c("#945196", "darkcyan", "darkblue")) + 
+  scale_fill_manual("Type", values = c("#945196", "darkcyan", "darkblue")) + 
+  scale_linetype_manual(name = NULL, values = c("H" = 1, "L" = 2)) +
+  #scale_alpha_manual(name = NULL, values = c("H" = 1, "L" = 0.5)) +
+  guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  geom_vline(xintercept = 7, lty=3) + 
+  scale_x_continuous("Time (months)", breaks = seq(0,14,2), 
+                     expand = c(0,0), limits = c(-0.1,14.2)) + 
+    scale_y_continuous("Cumulative infections", limits = c(0,2e+7), 
+                     expand = c(0,0), 
+                     labels = unit_format(unit = "M", scale = 1e-6)) +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 11),
+        axis.title = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 13),
+        legend.position = "none",
+        panel.grid = element_blank()) 
+
+plot4C
+```
+
+### 4D: Different scenarios
+```{r}
+plot4D <- data4D %>% mutate(InfsAdverted = paste0(InfsAdverted, "%")) %>%
+  mutate(InfsAdverted = case_when(InfsAdverted == "0%" ~NA_character_,
+                                  TRUE ~ InfsAdverted)) %>%
+  mutate(type = fct_relevel(type, c("No vaccination",
+        "Sigmoidal", "Concave")), scenario = fct_relevel(scenario, 
+        unique(data4D$scenario)), scenario = recode(scenario, 
+        `No vaccination` = "No\nvaccination",                                            
+        `Disparity: worst case` = "Disparity:\nworst case",
+        `Disparity: average` = "Disparity:\naverage",
+        `Equity: average` = "Equity:\naverage",
+        `Equity: best case` = "Equity:\nbest case")) %>%
+  ggplot(aes(scenario,InfsSinceMonth7,fill=type)) + theme_minimal() + 
+  geom_col(position = position_dodge2(preserve="single"), alpha=0.85) + 
+  geom_text(aes(label=InfsAdverted, col=type), vjust = -0.5,
+            position=position_dodge(width = 0.9), size = 3) + 
+  ggtitle("Infections since vaccination started after 7 months") +
+  scale_y_continuous("Total infections", 
+                     breaks = c(0, 2e+6, 4e+6,6e+6,8e+6,1e+7),
+                     limits = c(0,1.05e+7), expand = c(0,0),
+                     labels = unit_format(unit = "M", scale = 1e-6)) + 
+  scale_fill_manual(values = c("#945196","darkblue","darkcyan")) + 
+  scale_color_manual(values = c("#945196","darkblue","darkcyan")) + 
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 11),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 13),
+        legend.position = "none",
+        panel.grid = element_blank()) 
+plot4D
+```
+
+
+### 4AD: save
+```{r}
+#ggsave("../../Figures/final/figure4AD.pdf", plot4AD, width = 15, 
+#       height = 3)
+```
+
+### 4E: Phase diagrams
+
+### Column 1
+```{r}
+dataPlacesE <- paramsTableAll %>% 
+  mutate(type = case_when(Group == 1 ~ "Sigmoidal", TRUE ~ "Concave")) %>%
+  filter(SES == "H", WVH >= 5, WVH <=30) %>% select(type, Wh_H = WVH, Vm_H = MaxVac)
+# params C High: Vm = 0.82, Wh = 14
+plot4E1 <- data4E %>% filter(type == "Concave") %>%
+  ggplot(aes(x = Wh_H, y = Vm_H)) + theme_minimal() +  
+  geom_tile(aes(fill = PercInfAdverted), color = NA) +   
+  geom_point(data= tibble(Wh_H = c(14), Vm_H = c(0.82), type = c("Concave")), 
+        aes(Wh_H,Vm_H), shape = 4, col = "white", size = 2.5, stroke = 1) + 
+  geom_point(data= dataPlacesE %>% filter(type == "Concave"), 
+             aes(Wh_H,Vm_H), col = "white", size=0.2) + 
+  scale_fill_stepsn("Infections averted \nby vaccination (%)",
+                    labels = seq(20,90,10),breaks=seq(20,90,10),
+                    limits = c(10,100), 
+                    colours = viridis::viridis(9)) + 
+  scale_y_continuous("Potential maximum vaccinated (Vm)", expand = c(0,0),
+                     labels = scales::percent_format(accuracy = 1)) + 
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)",
+                     expand = c(0,0)) + ggtitle("Concave (k = 1.58)") +
+  facet_grid(ScenarioWh~ScenarioVm, scales = "free") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "none",
+        strip.text = element_text(colour = "black", size = 10.5, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+plot4E1
+```
+
+### Column 2
+```{r}
+# params S High: Vm = 0.9, Wh = 23
+plot4E2 <- data4E %>% filter(type == "Sigmoidal") %>%
+  ggplot(aes(x = Wh_H, y = Vm_H)) + theme_minimal() +  
+  geom_tile(aes(fill = PercInfAdverted), color = NA) +   
+  geom_point(data= tibble(Wh_H = c(23), Vm_H = c(0.9), type = c("Sigmoidal")), 
+        aes(Wh_H,Vm_H), shape = 4, col = "white", size = 2.5, stroke = 1) + 
+  geom_point(data= dataPlacesE %>% filter(type == "Sigmoidal"), 
+             aes(Wh_H,Vm_H), col = "white", size=0.2) + 
+  scale_fill_stepsn("Infections averted \nby vaccination (%)",
+                    labels = seq(20,90,10),breaks=seq(20,90,10),
+                    limits = c(10,100), 
+                    colours = viridis::viridis(9)) + 
+  scale_y_continuous("", expand = c(0,0),
+                     labels = scales::percent_format(accuracy = 1)) + 
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)",
+                     expand = c(0,0)) + ggtitle("Sigmoidal (k = 3.23)") +
+  facet_grid(ScenarioWh~ScenarioVm, scales = "free") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black"),
+        axis.title.y = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 10.5, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+plot4E2
+```
+
+
+### 4F: Differences
+
+#### By scenario
+
+```{r}
+colors <- c("#d4b9da","#e7e1ef",brewer.pal(10,"RdYlBu")[6:10])
+plot4F <- data4E %>% filter(
+      (ScenarioVm == "Equity in Vm: best case" & 
+         ScenarioWh == "Equity in Wh: best case") | 
+      (ScenarioVm == "Disparity in Vm: worst case" & 
+         ScenarioWh == "Disparity in Wh: worst case") ) %>%
+  mutate(Comb = case_when(ScenarioVm == "Equity in Vm: best case" & 
+         ScenarioWh == "Equity in Wh: best case" ~ "Best", 
+         TRUE ~ "Worst")) %>%
+  filter(Comb == "Best" | Comb == "Worst") %>%
+  mutate(ScenarioVm = NULL, ScenarioWh = NULL) %>%
+  pivot_wider(names_from = "Comb", 
+              values_from = "PercInfAdverted") %>% 
+  mutate(diff = Best-Worst) %>% ggplot(aes(x = Wh_H, y = Vm_H)) + 
+  theme_minimal() +  geom_tile(aes(fill = diff), color = NA) +   
+  geom_point(data= tibble(Wh_H = c(14, 23), Vm_H = c(0.82, 0.90), 
+                          type = c("Concave", "Sigmoidal")), 
+        aes(Wh_H,Vm_H), shape = 4, col = "white", size = 2, stroke = 1) + 
+  scale_fill_stepsn("Difference (%)",
+                    labels = seq(5,20,5),breaks=seq(5,20,5),
+                    limits = c(0,25), 
+                    colours = colors[3:7]) + 
+  scale_y_continuous("Potential Vm", expand = c(0,0),
+                     labels = scales::percent_format(accuracy = 1)) + 
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)",
+                     expand = c(0,0)) +
+  geom_point(data= dataPlacesE, aes(Wh_H,Vm_H), col = "white", size=0.2) + 
+  facet_wrap(~type, scales = "free", ncol = 2) + 
+  ggtitle("Difference between best and worst scenario") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+plot4F
+```
+
+#### By type
+```{r}
+plot4G <- data4E %>% filter((ScenarioVm == "Equity in Vm: best case" & 
+         ScenarioWh == "Equity in Wh: best case") | 
+      (ScenarioVm == "Disparity in Vm: worst case" & 
+         ScenarioWh == "Disparity in Wh: worst case")) %>%
+  mutate(Comb = case_when(ScenarioVm == "Equity in Vm: best case" & 
+         ScenarioWh == "Equity in Wh: best case" ~ "Equity: best case", 
+         TRUE ~ "Disparity: worst case")) %>%
+  mutate(Comb = fct_relevel(Comb, "Equity: best case")) %>% 
+  pivot_wider(names_from = "type", values_from = "PercInfAdverted") %>% 
+  mutate(diff = Concave-Sigmoidal) %>% ggplot(aes(x = Wh_H, y = Vm_H)) + 
+  theme_minimal() + geom_tile(aes(fill = diff), color = NA) +   
+  scale_fill_stepsn("Difference (%)", labels = seq(-5,20,5), 
+                    breaks=seq(-5,20,5), limits = c(-10,25), 
+                    colours = colors) + 
+  scale_y_continuous("Potential Vm ", expand = c(0,0),
+                     labels = scales::percent_format(accuracy = 1)) + 
+  scale_x_continuous("Week at which the rate is half of Vm (Wh)",
+                     expand = c(0,0)) +
+  geom_point(data= dataPlacesE, aes(Wh_H,Vm_H), col = "gray0", size=0.2) + 
+  facet_wrap(~Comb, scales = "free", ncol = 2) + 
+  ggtitle("Difference between concave and sigmoidal type") +
+  theme(axis.text = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1)
+plot4G
+```
+
+### 4: Combine and save
+
+```{r}
+plot4AC <- plot_grid(plot4A, plot4B, plot4C, nrow = 1, labels = "AUTO") 
+plot4AD <- plot_grid(plot4AC, plot4D, nrow = 1, labels = c(NA,"D"), 
+                    rel_widths = c(2.25,1))
+fig4E <- plot_grid(plot4E1, NULL, plot4E2, nrow=1, rel_widths=c(1,0.02,1.255))
+fig4FG <- plot_grid(plot4F, plot4G, nrow = 2, labels = c("F", "G"))
+fig4EG <- plot_grid(fig4E, NULL, fig4FG,  nrow = 1, labels = c("E", "", ""), 
+                    rel_widths = c(2, 0.01, 1))
+fig4 <- plot_grid(plot4AD, fig4EG, nrow = 2, rel_heights=c(0.6,1))
+
+ggsave("../../Figures/final/figure4Supp_infs.pdf", fig4, width = 17, height = 8.5)
+ggsave("../../Figures/final/figure4Supp_infs.png", fig4, width = 17, height = 8.5)
+```
+
+
+## Supp 20: extreme trends
+```{r}
+plot4A_supp <- trends_full %>% 
+  group_by(Type, SES, Vm, Wh) %>%
+  mutate(value = cumsum(value)) %>%
+  ungroup() %>%
+  mutate(Vac = 100*value, SES = recode(SES, H = "High SES", L = "Low SES"), 
+         Type = recode(Type,  S = "Sigmoidal", C ="Concave"),
+         Vm = recode(Vm,  "50" = "Vm = 50%", "100" ="Vm = 100%"),
+         Wh = recode(Wh,  "5" = "Wh = 5", "30" ="Wh = 30")) %>% 
+  select(time, Vac, Type, Vm, Wh) %>% ggplot() + theme_minimal() + 
+  ggtitle("Cumulative vaccination rates") + 
+  geom_line(aes(x=time/30, y = Vac, col = Type), size = 1) +
+  facet_rep_grid(Wh~Vm, scales = "free", repeat.tick.labels = "all") +
+  scale_color_manual("", values = c("darkcyan", "darkblue")) + 
+  guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  scale_x_continuous("Time (months)", breaks = seq(0,14,2), 
+                     expand = c(0,0), limits = c(0,14)) + 
+  scale_y_continuous("Population vaccinated (%)", limits = c(0,100),
+                    breaks = seq(0,100,20), expand = c(0,0.1)) +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 14),
+        strip.text = element_text(colour = "black", size = 12),
+        panel.spacing=unit(1.5,"lines"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 8),
+        legend.key.height = unit(0.4,"cm"),
+        legend.key.width = unit(0.8,"cm"),
+        legend.spacing = unit(-0.5, 'cm'),
+        legend.justification = c(0.99, 0.99), legend.position = c(0.99, 0.99),
+        legend.box.background = element_rect(fill= "white", colour = NA)) 
+plot4A_supp
+
+ggsave("../../Figures/final/Supp_Extreme_Trends.pdf", plot4A_supp, width = 8, height = 6)
+
+plot4A_supp_alt <- trends_full %>% 
+  group_by(Type, SES, Vm, Wh) %>%
+  #mutate(value = cumsum(value)) %>%
+  ungroup() %>%
+  mutate(Vac = 100*value, SES = recode(SES, H = "High SES", L = "Low SES"), 
+         Type = recode(Type,  S = "Sigmoidal", C ="Concave"),
+         Vm = recode(Vm,  "50" = "Vm = 50%", "100" ="Vm = 100%"),
+         Wh = recode(Wh,  "5" = "Wh = 5", "30" ="Wh = 30")) %>% 
+  select(time, Vac, Type, Vm, Wh) %>% ggplot() + theme_minimal() + 
+  ggtitle("Cumulative vaccination rates") + 
+  geom_line(aes(x=time/30, y = Vac, col = Type), size = 1) +
+  facet_rep_grid(Wh~Vm, scales = "free", repeat.tick.labels = "all") +
+  scale_color_manual("", values = c("darkcyan", "darkblue")) + 
+  guides(col = guide_legend(order = 1), fill = guide_legend(order = 1)) + 
+  scale_x_continuous("Time (months)", breaks = seq(0,14,2), 
+                     expand = c(0,0), limits = c(0,14)) + 
+  scale_y_continuous("Population vaccinated (%)", limits = c(0,2.5),
+                    breaks = seq(0,2,0.5), expand = c(0,0.1)) +
+  theme(axis.line = element_line(color= "black", size = 0.5),
+        axis.ticks = element_line(color= "black", size = 0.5),
+        axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 12),
+        plot.title = element_text(colour = "black", size = 14),
+        strip.text = element_text(colour = "black", size = 12),
+        panel.spacing=unit(1.5,"lines"),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 8),
+        legend.key.height = unit(0.4,"cm"),
+        legend.key.width = unit(0.8,"cm"),
+        legend.spacing = unit(-0.5, 'cm'),
+        legend.justification = c(0.99, 0.99), legend.position = c(0.99, 0.99),
+        legend.box.background = element_rect(fill= "white", colour = NA)) 
+plot4A_supp_alt
+
+```
+
+
+
+
+## Tables
+
+### Table: Disparities
+
+```{r}
+
+SuppBarRatioTable <- SuppBarRatio %>% pivot_wider(names_from = "Calc", values_from = "value") %>% select(Name, RatioFinal, RatioMax, RatioAverage)
+
+SuppBarDiffTable <- SuppBarDiff %>% pivot_wider(names_from = "Calc", values_from = "value") %>% select(Name, DeltaFinal, DeltaMax, DeltaAverage)
+
+DispTable <- left_join(SuppBarRatioTable, SuppBarDiffTable) %>% arrange(RatioFinal) %>%
+  mutate(RatioFinal = rank(-RatioFinal), RatioMax = rank(-RatioMax), RatioAverage = rank(-RatioAverage), DeltaFinal = rank(-DeltaFinal), DeltaMax = rank(-DeltaMax), DeltaAverage = rank(-DeltaAverage)) %>%
+  arrange(RatioFinal) %>% 
+  left_join(dataGini %>% select(Name = country, GiniIndex = gini)) %>% left_join(datGiniV %>% select(Name = Country, GiniVaccination = gini)) %>% mutate(GiniVaccination = 100*round(GiniVaccination, 4))
+
+write_csv(DispTable, "../../Data/data_tables/DispTable.csv")
+
+```
+### Table: Parameters
+```{r}
+
+TableAvgRow <- paramsTableAll %>% 
+  group_by(SES, Group) %>% 
+  summarise(Vm = mean(MaxVac), Wh = mean(WVH), k = mean(h)) %>%
+  ungroup() %>%
+  mutate(Name = "Mean Parameters") %>%
+  select(Name, SES, Group, Vm, Wh, k)
+
+TableParam <- paramsTableAll %>% rbind(paramsTableAllSupp) %>% 
+  group_by(Name, SES, Group) %>%
+  summarise(Vm = mean(MaxVac), Wh = mean(WVH), k = mean(h)) %>%
+  ungroup() %>%
+  select(Name, SES, Group, Vm, Wh, k) %>%
+  rbind(TableAvgRow) %>%
+  mutate(Vm = round(Vm, 2), Wh = round(Wh, 2), k = round(k, 2))
+
+write_csv(TableParam, "../../Data/data_tables/ParamTable.csv")
+
+```
+### Table: resolution
+
+```{r}
+
+tableRes <- dataTstar %>% 
+  select(Name, numberLoc) %>% distinct() %>% arrange(numberLoc) %>%
+  rename(Resolution = numberLoc)
+
+write_csv(tableRes, "../../Data/data_tables/ResTable.csv")
+
+```
+
+
+## WHO
+
+```{r}
+plotWHO <- dataTexampAll %>% left_join(dataCont) %>%
+  filter(Name == "India" | Name == "Ecuador" | Name == "Malaysia") %>%
+  mutate(Name = factor(Name, c("Ecuador","India", "Malaysia"))) %>%  pivot_longer(cols = H:L,names_to = "SES", values_to = "PropV") %>%
+  mutate(SES = recode(SES, H = "High SES", L = "Low SES"), PropV = 100*PropV) %>%
+  ggplot(aes(week, PropV, col = Name)) + 
+  facet_wrap(~Name, scales = "free", ncol = 9) + 
+scale_color_manual("Country", values = c("#0d0887","#b12a90","#fca636")) +  geom_point(data=. %>% filter(type == "observed") %>% rename(Observed = SES), 
+          aes(shape = Observed), size = 0.2, alpha = 0.5) + theme_classic() + 
+  geom_line(data=. %>% filter(type == "predicted") %>% rename(Fit = SES), 
+            aes(linetype = Fit), size = 0.75) + 
+  scale_x_continuous("Week", breaks = seq(0,60,20), limits = c(0,65)) + 
+  scale_y_continuous("Percentage of the population vaccinated \nwith at least one dose",
+                     breaks = seq(0,80,40), limits = c(0,99)) + 
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+  theme(axis.text = element_text(color = "black", size = 10),
+        axis.title = element_text(color = "black", size = 11),
+        legend.title = element_text(color = "black", size = 11),
+        legend.text = element_text(color = "black", size = 11),
+        axis.line = element_line(color = "black", size = 0.5),
+        strip.text = element_text(colour = 'black', size = 8),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "bottom", legend.key.width = unit(0.35,"cm"),
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.y = element_text(margin = margin(r = 7)),
+        axis.title.x = element_text(margin = margin(t = 7)))
+
+ggsave("C:/Users/sophi/Box/WHO_project/Report Figures 10-31/TimeSeries.png", plotWHO, width = 10, height = 4)
+
+plotWHO
+```

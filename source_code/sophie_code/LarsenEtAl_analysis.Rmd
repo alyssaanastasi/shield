@@ -1,0 +1,3315 @@
+---
+title: "LarsenEtAl_analysis.Rmd"
+author: "Sophie L. Larsen and Pamela P. Martinez"
+date: "`r format(Sys.time(), '%B %Y')`"
+output: html_notebook
+  output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(viridis)
+library(lubridate)
+library(dineq)
+library(cowplot)
+library(readxl)
+library(MetBrewer)
+library(oce)
+library(tidyverse)
+library(ineq)
+library(readxl)
+library(DescTools)
+library(tidyverse)
+library(directlabels)
+library(MetBrewer)
+library(cowplot)
+library(ggrepel)
+library(viridis)
+library(ggpubr)
+library(readxl)
+library(mclust)
+```
+
+## Lorenz Curves
+### Argentina 
+
+```{r}
+
+#### Argentina ####
+Argentina <- read_csv("../../Data/final/AR_Set.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  mutate(measure = NULL) %>% 
+  distinct() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+
+LArgentina <- Lc(Argentina$vcum, Argentina$pop, plot = F)
+GiniArgentina <- Gini(Argentina$vcum, Argentina$pop, unbiased = F)
+
+
+df_Argentina <- data.frame(LArgentina$p,LArgentina$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Argentina") %>%
+  mutate(Gini = GiniArgentina)
+ 
+```
+
+### Bangladesh 
+```{r}
+
+#### Bangladesh ####
+Bangladesh <- read_csv("../../Data/final/BA_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location, date, pop) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>%
+  group_by(location) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>% 
+  mutate(measure = NULL) %>% 
+  distinct() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+    ## correct pop 
+    popBA <- read_csv("BApopCorrect.csv") %>%
+      mutate(location = gsub(" ", "", location))
+    Bangladesh <- Bangladesh %>%
+      mutate(pop = NULL) %>%
+      left_join(popBA) %>%
+      filter(!is.na(pop))
+    
+    LBangladesh <- Lc(Bangladesh$vcum, Bangladesh$pop, plot = F)
+    GiniBangladesh <- Gini(Bangladesh$vcum, Bangladesh$pop, unbiased = F)
+    
+    df_Bangladesh <- data.frame(LBangladesh$p,LBangladesh$L) %>%
+      rename(p = 1, L = 2) %>%
+      mutate(country = "Bangladesh") %>%
+      mutate(Gini = GiniBangladesh)
+
+```
+
+
+### Belgium 
+```{r}
+
+#### Belgium ####
+    
+Belgium <- read_csv("../../Data/final/Be_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(year == 2021, week == max(week)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+      mutate(measure = NULL) %>% 
+      distinct()%>%
+      filter((week-max(week)) == 0)
+
+
+LBelgium <- Lc(Belgium$vcum, Belgium$pop, plot = F)
+GiniBelgium <- Gini(Belgium$vcum, Belgium$pop, unbiased = F)
+
+
+df_Belgium <- data.frame(LBelgium$p,LBelgium$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Belgium") %>%
+  mutate(Gini = GiniBelgium)
+
+```
+
+### Chile 
+```{r}
+
+#### Chile ####
+
+Chile <- read_csv("../../Data/final/ChileDose1.csv")
+
+cut <- c(as.Date("01.03.2021", "%d.%m.%Y"))
+
+## filter out data before march 1 because there are reporting issues ##
+Chile <- Chile %>%
+  filter(Fecha >= cut)
+
+Chile <- Chile %>%
+  rename(location = "Codigo comuna")%>%
+  rename(date = "Fecha", vnum = "Primera Dosis") %>%
+  add_column(dose = "partial") %>%
+  group_by(date, location, dose) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>%
+  group_by(location, dose) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() 
+
+popCh <- read_csv("Chilepop.csv")[c("Comuna", "Poblacion 2021")] %>%
+  rename(location = "Comuna") %>%
+  rename(pop = "Poblacion 2021") %>%
+  group_by(location) %>%
+  summarise(pop = sum(pop, na.rm = T))
+
+Chile <- left_join(Chile, popCh, by = "location") %>%
+  filter(!is.na(vcum), !is.na(pop)) %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  mutate(measure = NULL) %>% 
+  distinct() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+
+LChile <- Lc(Chile$vcum, Chile$pop, plot = F)
+GiniChile <- Gini(Chile$vcum, Chile$pop, unbiased = F)
+
+
+df_Chile <- data.frame(LChile$p,LChile$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Chile") %>%
+  mutate(Gini = GiniChile)
+
+
+```
+
+
+### Colombia 
+```{r}
+
+#### Colombia ####
+
+## no dose info
+
+Colpop <- read_csv("../../Data/final/Colombia_Set1.csv")[c("location", "population")]
+
+Colombia <- read_csv("../../Data/final/Colombia_Set2.csv") %>%
+  left_join(Colpop, by = "location") %>%
+  filter(!is.na(date)) %>%
+  group_by(date, location, population) %>%
+  summarise(vnum = sum(applied_dose, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>% 
+  group_by(location) %>% 
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(population), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+
+LColombia <- Lc(Colombia$vcum, Colombia$population, plot = F)
+GiniColombia <- Gini(Colombia$vcum, Colombia$pop, unbiased = F)
+
+
+df_Colombia <- data.frame(LColombia$p,LColombia$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Colombia") %>%
+  mutate(Gini = GiniColombia)
+
+```
+
+
+### Cape Verde
+```{r}
+#### Cape Verde ####
+
+CapeVerde <- read_csv("../../Data/final/CV_Set.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LCapeVerde <- Lc(CapeVerde$vcum, CapeVerde$pop, plot = F)
+GiniCapeVerde <- Gini(CapeVerde$vcum, CapeVerde$pop, unbiased = F)
+
+
+df_CapeVerde <- data.frame(LCapeVerde$p,LCapeVerde$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Cape Verde") %>%
+  mutate(Gini = GiniCapeVerde)
+
+```
+
+### Czech Republic
+```{r}
+#### Czech Republic ####
+
+Czechia <- read_csv("../../Data/final/CZ_Set.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LCzechRepublic <- Lc(Czechia$vcum, Czechia$pop, plot = F)
+GiniCzechia <- Gini(Czechia$vcum, Czechia$pop, unbiased = F)
+
+
+df_CzechRepublic <- data.frame(LCzechRepublic$p,LCzechRepublic$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Czech Republic") %>%
+  mutate(Gini = GiniCzechia)
+
+```
+
+
+### Ecuador 
+```{r}
+### Ecuador ####
+
+Ecuador <- read_csv("../../Data/final/EC_canton.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+  
+LEcuador <- Lc(Ecuador$vcum, Ecuador$pop, plot = F)
+GiniEcuador <- Gini(Ecuador$vcum, Ecuador$pop, unbiased = F)
+
+
+df_Ecuador <- data.frame(LEcuador$p,LEcuador$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Ecuador") %>%
+  mutate(Gini = GiniEcuador)
+
+```
+
+
+### France 
+
+```{r}
+
+#### France ####
+
+France <- read_csv("../../Data/final/FR_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(date, location, pop) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>% 
+  group_by(location) %>% 
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LFrance <- Lc(France$vcum, France$pop, plot = F)
+GiniFrance <- Gini(France$vcum, France$pop, unbiased = F)
+
+
+df_France <- data.frame(LFrance$p,LFrance$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "France") %>%
+  mutate(Gini = GiniFrance)
+
+```
+
+
+### India 
+```{r}
+#### India ####
+
+India <- read_csv("../../Data/final/IN_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(week == max(week)) %>%
+  ungroup() %>%
+  filter(!is.na(population), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter((week-max(week)) == 0)
+
+LIndia <- Lc(India$vcum, India$population, plot = F)
+GiniIndia <- Gini(India$vcum, India$pop, unbiased = F)
+
+
+df_India <- data.frame(LIndia$p,LIndia$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "India") %>%
+  mutate(Gini = GiniIndia)
+
+```
+
+### Germany 
+```{r}
+
+#### Germany ####
+
+Germany <- read_csv("../../Data/final/GE_Set_1.csv") %>%
+  filter(dose == 1) %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(Population), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LGermany <- Lc(Germany$vcum, Germany$Population, plot = F)
+GiniGermany <- Gini(Germany$vcum, Germany$pop, unbiased = F)
+
+
+df_Germany <- data.frame(LGermany$p,LGermany$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Germany") %>%
+  mutate(Gini = GiniGermany)
+
+```
+
+### Israel
+```{r}
+
+#### Israel ####
+
+Israel <- read_csv("../../Data/final/IS_Set_1.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LIsrael <- Lc(Israel$vcum, Israel$pop, plot = F)
+GiniIsrael <- Gini(Israel$vcum, Israel$pop, unbiased = F)
+
+
+df_Israel <- data.frame(LIsrael$p,LIsrael$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Israel") %>%
+  mutate(Gini = GiniIsrael)
+
+```
+
+
+### ITaly
+```{r}
+#### Italy ####
+
+Italy <- read_csv("../../Data/final/IT_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(date, location, pop) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>% 
+  group_by(location) %>% 
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LItaly <- Lc(Italy$vcum, Italy$pop, plot = F)
+GiniItaly <- Gini(Italy$vcum, Italy$pop, unbiased = F)
+
+
+df_Italy <- data.frame(LItaly$p,LItaly$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Italy") %>%
+  mutate(Gini = GiniItaly) 
+
+```
+
+### Japan 
+```{r}
+#### Japan ####
+
+Japan <- read_csv("../../Data/final/JP_Set_1.csv") %>%
+  filter(dose == 1) %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+  
+LJapan <- Lc(Japan$vcum, Japan$pop, plot = F)
+GiniJapan <- Gini(Japan$vcum, Japan$pop, unbiased = F)
+
+
+df_Japan <- data.frame(LJapan$p,LJapan$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Japan") %>%
+  mutate(Gini = GiniJapan)
+
+```
+
+### Kazakhstan
+```{r}
+#### Kazakhstan ####
+
+Kazakhstan <- read_csv("../../Data/final/Kaz_Set.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(population), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LKazakhstan <- Lc(Kazakhstan$vcum, Kazakhstan$population, plot = F)
+GiniKaz <- Gini(Kazakhstan$vcum, Kazakhstan$population, unbiased = F)
+
+
+df_Kazakhstan <- data.frame(LKazakhstan$p,LKazakhstan$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Kazakhstan") %>%
+  mutate(Gini = GiniKaz)
+
+```
+
+### Korea 
+```{r}
+#### Korea ####
+
+Korea <- read_csv("../../Data/final/KO_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(date, location, pop) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>% 
+  group_by(location) %>% 
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LKorea <- Lc(Korea$vcum, Korea$pop, plot = F)
+GiniKorea <- Gini(Korea$vcum, Korea$pop, unbiased = F)
+
+
+df_Korea <- data.frame(LKorea$p,LKorea$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Republic of Korea") %>%
+  mutate(Gini = GiniKorea)
+
+```
+
+### Malaysia
+```{r}
+#### Malaysia ####
+
+Malaysia <- read_csv("../../Data/final/My_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LMalaysia <- Lc(Malaysia$vcum, Malaysia$pop, plot = F)
+GiniMalaysia <- Gini(Malaysia$vcum, Malaysia$pop, unbiased = F)
+
+
+df_Malaysia <- data.frame(LMalaysia$p,LMalaysia$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Malaysia") %>%
+  mutate(Gini = GiniMalaysia)
+
+```
+
+### Norway 
+```{r}
+#### Norway ####
+
+Norway <- read_csv("../../Data/final/NO_Set.csv") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LNorway <- Lc(Norway$vcum, Norway$pop, plot = F)
+GiniNorway <- Gini(Norway$vcum, Norway$pop, unbiased = F)
+
+
+df_Norway <- data.frame(LNorway$p,LNorway$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Norway") %>%
+  mutate(Gini = GiniNorway)
+
+```
+
+
+### Puerto Rico 
+```{r}
+#### Puerto Rico ####
+
+## recall: no dose info
+PuertoRico <- read_csv("../../Data/final/PR_Set_1.csv") %>%
+  group_by(date, location, pop) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(date) %>% 
+  group_by(location) %>% 
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LPuertoRico <- Lc(PuertoRico$vcum, PuertoRico$pop, plot = F)
+GiniPR <- Gini(PuertoRico$vcum, PuertoRico$pop, unbiased = F)
+
+
+df_PuertoRico <- data.frame(LPuertoRico$p,LPuertoRico$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Puerto Rico") %>%
+  mutate(Gini = GiniPR)
+
+```
+
+
+### RUssia
+```{r}
+#### Russia ####
+
+Russia <- read_csv("../../Data/final/RU_Set_12.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(region) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(region)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LRussia <- Lc(Russia$vcum, Russia$pop, plot = F)
+GiniRussia <- Gini(Russia$vcum, Russia$pop, unbiased = F)
+
+
+df_Russia <- data.frame(LRussia$p,LRussia$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Russia") %>%
+  mutate(Gini = GiniRussia)
+
+```
+
+### SPain 
+```{r}
+#### Spain ####
+
+Spain <- read_csv("../../Data/final/SP_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(region) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(region)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LSpain <- Lc(Spain$vcum, Spain$pop, plot = F)
+GiniSpain <- Gini(Spain$vcum, Spain$pop, unbiased = F)
+
+
+df_Spain <- data.frame(LSpain$p,LSpain$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Spain") %>%
+  mutate(Gini = GiniSpain)
+
+```
+
+### Sweden 
+```{r}
+#### Sweden ####
+
+
+Sweden <- read_csv("../../Data/final/SW_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(region) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(region)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LSweden <- Lc(Sweden$vcum, Sweden$pop, plot = F)
+GiniSW <- Gini(Sweden$vcum, Sweden$pop, unbiased = F)
+
+
+df_Sweden <- data.frame(LSweden$p,LSweden$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Sweden") %>%
+  mutate(Gini = GiniSW)
+
+```
+
+
+### TUrkey 
+```{r}
+
+#### Turkey ####
+
+Turkey <- read_csv("../../Data/final/TR_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(population), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LTurkey <- Lc(Turkey$vcum, Turkey$population, plot = F)
+GiniTR <- Gini(Turkey$vcum, Turkey$population, unbiased = F)
+
+
+df_Turkey <- data.frame(LTurkey$p,LTurkey$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Turkey") %>%
+  mutate(Gini = GiniTR)
+
+```
+
+### Uruguay
+```{r}
+#### Uruguay ####
+
+Uruguay <- read_csv("../../Data/final/UR_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  group_by(location) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(vcum), !is.na(location)) %>%
+  mutate(measure = NULL) %>% 
+  distinct()%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LUruguay <- Lc(Uruguay$vcum, Uruguay$pop, plot = F)
+GiniUruguay <- Gini(Uruguay$vcum, Uruguay$pop, unbiased = F)
+
+
+df_Uruguay <- data.frame(LUruguay$p,LUruguay$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Uruguay") %>%
+  mutate(Gini = GiniUruguay)
+
+
+```
+
+
+### Brazil 
+```{r}
+#### Brazil ####
+setwd("../../Data/final/Brazil/Finished sets")
+
+BRpop <- read_csv("BR_Set_2.csv") %>%
+  filter(measure == "population") %>%
+  mutate(state = NULL, measure = NULL, location = NULL) %>%
+  rename(state = stateac, pop = value)
+
+##### Brazil, AC #####
+AC <- read_csv("BR_Set_1_AC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LAC <- Lc(AC$vcum, AC$pop, plot = F)
+GiniAC <- Gini(AC$vcum, AC$pop, unbiased = F)
+
+
+df_AC <- data.frame(LAC$p,LAC$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, AC") %>%
+  mutate(Gini = GiniAC)
+
+
+##### Brazil, AL #####
+
+AL <- read_csv("BR_Set_1_AL.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LAL <- Lc(AL$vcum, AL$pop, plot = F)
+GiniAL <- Gini(AL$vcum, AL$pop, unbiased = F)
+
+
+df_AL <- data.frame(LAL$p,LAL$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, AL") %>%
+  mutate(Gini = GiniAL)
+
+##### Brazil, AM #####
+  
+AM <- read_csv("BR_Set_1_AM.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LAM <- Lc(AM$vcum, AM$pop, plot = F)
+GiniAM <- Gini(AM$vcum, AM$pop, unbiased = F)
+
+
+df_AM <- data.frame(LAM$p,LAM$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, AM") %>%
+  mutate(Gini = GiniAM)
+
+
+##### Brazil, AP ####
+
+AP <- read_csv("BR_Set_1_AP_codetest.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LAP <- Lc(AP$vcum, AP$pop, plot = F)
+GiniAP <- Gini(AP$vcum, AP$pop, unbiased = F)
+
+
+df_AP <- data.frame(LAP$p,LAP$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, AP") %>%
+  mutate(Gini = GiniAP)
+
+
+##### Brazil, BA #####
+
+BA <- read_csv("BR_Set_1_BA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LBA <- Lc(BA$vcum, BA$pop, plot = F)
+GiniBA <- Gini(BA$vcum, BA$pop, unbiased = F)
+
+
+df_BA <- data.frame(LBA$p,LBA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, BA") %>%
+  mutate(Gini = GiniBA)
+
+
+##### Brazil, CE #####
+
+CE <- read_csv("BR_Set_1_CE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LCE <- Lc(CE$vcum, CE$pop, plot = F)
+GiniCE <- Gini(CE$vcum, CE$pop, unbiased = F)
+
+
+df_CE <- data.frame(LCE$p,LCE$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, CE") %>%
+  mutate(Gini = GiniCE)
+
+
+##### Brazil, DF #####
+
+DF <- read_csv("BR_Set_1_DF.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LDF <- Lc(DF$vcum, DF$pop, plot = F)
+GiniDF <- Gini(DF$vcum, DF$pop, unbiased = F)
+
+
+df_DF <- data.frame(LDF$p,LDF$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, DF")  %>%
+  mutate(Gini = GiniDF)
+
+
+##### Brazil, ES #####
+
+ES <- read_csv("BR_Set_1_ES.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LES <- Lc(ES$vcum, ES$pop, plot = F)
+GiniES <- Gini(ES$vcum, ES$pop, unbiased = F)
+
+
+df_ES <- data.frame(LES$p,LES$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, ES") %>%
+  mutate(Gini = GiniES)
+
+##### Brazil, GO #####
+
+GO <- read_csv("BR_Set_1_GO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LGO <- Lc(GO$vcum, GO$pop, plot = F)
+GiniGO <- Gini(GO$vcum, GO$pop, unbiased = F)
+
+
+df_GO <- data.frame(LGO$p,LGO$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, GO") %>%
+  mutate(Gini = GiniGO)
+
+
+##### Brazil, MA #####
+
+MA <- read_csv("BR_Set_1_MA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LMA <- Lc(MA$vcum, MA$pop, plot = F)
+GiniMA <- Gini(MA$vcum, MA$pop, unbiased = F)
+
+
+df_MA <- data.frame(LMA$p,LMA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, MA") %>%
+  mutate(Gini = GiniMA)
+
+
+##### Brazil, MG #####
+
+
+MG <- read_csv("BR_Set_1_MG.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LMG <- Lc(MG$vcum, MG$pop, plot = F)
+GiniMG <- Gini(MG$vcum, MG$pop, unbiased = F)
+
+
+df_MG <- data.frame(LMG$p,LMG$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, MG") %>%
+  mutate(Gini = GiniMG)
+
+##### Brazil, MS #####
+
+MS <- read_csv("BR_Set_1_MS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LMS <- Lc(MS$vcum, MS$pop, plot = F)
+GiniMS <- Gini(MS$vcum, MS$pop, unbiased = F)
+
+
+df_MS <- data.frame(LMS$p,LMS$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, MS") %>%
+  mutate(Gini = GiniMS)
+
+##### Brazil, MT #####
+
+MT <- read_csv("BR_Set_1_MT.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LMT <- Lc(MT$vcum, MT$pop, plot = F)
+GiniMT <- Gini(MT$vcum, MT$pop, unbiased = F)
+
+
+df_MT <- data.frame(LMT$p,LMT$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, MT") %>%
+  mutate(Gini = GiniMT)
+
+##### Brazil, PA #####
+
+PA <- read_csv("BR_Set_1_PA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LPA <- Lc(PA$vcum, PA$pop, plot = F)
+GiniPA <- Gini(PA$vcum, PA$pop, unbiased = F)
+
+
+df_PA <- data.frame(LPA$p,LPA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, PA") %>%
+  mutate(Gini = GiniPA)
+
+##### Brazil PB #####
+
+PB <- read_csv("BR_Set_1_PB.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LPB <- Lc(PB$vcum, PB$pop, plot = F)
+GiniPB <- Gini(PB$vcum, PB$pop, unbiased = F)
+
+
+df_PB <- data.frame(LPB$p,LPB$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, PB") %>%
+  mutate(Gini = GiniPB)
+
+##### Brazil, PE #####
+
+PE <- read_csv("BR_Set_1_PE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LPE <- Lc(PE$vcum, PE$pop, plot = F)
+GiniPE <- Gini(PE$vcum, PE$pop, unbiased = F)
+
+
+df_PE <- data.frame(LPE$p,LPE$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, PE") %>%
+  mutate(Gini = GiniPE)
+
+
+##### Brazil, PI #####
+
+PI <- read_csv("BR_Set_1_PI.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LPI <- Lc(PI$vcum, PI$pop, plot = F)
+GiniPI <- Gini(PI$vcum, PI$pop, unbiased = F)
+
+
+df_PI <- data.frame(LPI$p,LPI$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, PI") %>%
+  mutate(Gini = GiniPI)
+
+##### Brazil, PR #####
+
+BrPR <- read_csv("BR_Set_1_PR.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LBrPR <- Lc(BrPR$vcum, BrPR$pop, plot = F)
+GiniBrPR <- Gini(BrPR$vcum, BrPR$pop, unbiased = F)
+
+
+df_BrPR <- data.frame(LBrPR$p,LBrPR$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, PR") %>%
+  mutate(Gini = GiniBrPR)
+
+
+##### Brazil, RN #####
+
+RN <- read_csv("BR_Set_1_RN.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LRN <- Lc(RN$vcum, RN$pop, plot = F)
+GiniRN <- Gini(RN$vcum, RN$pop, unbiased = F)
+
+
+df_RN <- data.frame(LRN$p,LRN$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, RN") %>%
+  mutate(Gini = GiniRN)
+
+
+##### Brazil, RJ #####
+
+RJ <- read_csv("BR_Set_1_RJ.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LRJ <- Lc(RJ$vcum, RJ$pop, plot = F)
+GiniRJ <- Gini(RJ$vcum, RJ$pop, unbiased = F)
+
+
+df_RJ <- data.frame(LRJ$p,LRJ$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, RJ") %>%
+  mutate(Gini = GiniRJ)
+
+
+##### Brazil, RO #####
+
+RO <- read_csv("BR_Set_1_RO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LRO <- Lc(RO$vcum, RO$pop, plot = F)
+GiniRO <- Gini(RO$vcum, RO$pop, unbiased = F)
+
+
+df_RO <- data.frame(LRO$p,LRO$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, RO") %>%
+  mutate(Gini = GiniRO)
+
+##### Brazil, RS #####
+
+RS <- read_csv("BR_Set_1_RS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LRS <- Lc(RS$vcum, RS$pop, plot = F)
+GiniRS <- Gini(RS$vcum, RS$pop, unbiased = F)
+
+
+df_RS <- data.frame(LRS$p,LRS$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, RS") %>%
+  mutate(Gini = GiniRS)
+
+
+##### Brazil, SC #####
+
+
+SC <- read_csv("BR_Set_1_SC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LSC <- Lc(SC$vcum, SC$pop, plot = F)
+GiniSC <- Gini(SC$vcum, SC$pop, unbiased = F)
+
+
+df_SC <- data.frame(LSC$p,LSC$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, SC") %>%
+  mutate(Gini = GiniSC)
+
+##### Brazil, SE #####
+
+SE <- read_csv("BR_Set_1_SE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LSE <- Lc(SE$vcum, SE$pop, plot = F)
+GiniSE <- Gini(SE$vcum, SE$pop, unbiased = F)
+
+
+df_SE <- data.frame(LSE$p,LSE$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, SE") %>%
+  mutate(Gini = GiniSE)
+
+
+##### Brazil, SP #####
+
+SP <- read_csv("BR_Set_1_SP.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LSP <- Lc(SP$vcum, SP$pop, plot = F)
+GiniSP <- Gini(SP$vcum, SP$pop, unbiased = F)
+
+
+df_SP <- data.frame(LSP$p,LSP$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, SP") %>%
+  mutate(Gini = GiniSP)
+
+
+##### Brazil, TO #####
+
+TO <- read_csv("BR_Set_1_TO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  filter(dose == "partial") %>%
+  arrange(date) %>%
+  group_by(code) %>%
+  mutate(vcum = cumsum(vnum)) %>%
+  ungroup() %>% 
+  group_by(code) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  left_join(BRpop) %>%
+  filter(!is.na(pop), !is.na(code), !is.na(vcum))%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+
+LTO <- Lc(TO$vcum, TO$pop, plot = F)
+GiniTO <- Gini(TO$vcum, TO$pop, unbiased = F)
+
+
+df_TO <- data.frame(LTO$p,LTO$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "Brazil, TO") %>%
+  mutate(Gini = GiniTO)
+
+
+##exclude DF, CE since these aren't in our other analyses
+df_Brazil <- rbind(df_AC, df_AL) %>%
+  rbind(df_AM) %>%
+  rbind(df_AP) %>%
+  rbind(df_BA) %>%
+  rbind(df_GO) %>%
+  rbind(df_MA) %>%
+  rbind(df_MG) %>%
+  rbind(df_MS) %>%
+  rbind(df_MT) %>%
+  rbind(df_PA) %>%
+  rbind(df_PB) %>%
+  rbind(df_PE) %>%
+  rbind(df_PI) %>%
+  rbind(df_BrPR) %>%
+  rbind(df_RN) %>%
+  rbind(df_RJ) %>%
+  rbind(df_RO) %>%
+  rbind(df_RS) %>%
+  rbind(df_SC) %>%
+  rbind(df_SE) %>% 
+  rbind(df_SP) %>%
+  rbind(df_TO) %>%
+  rbind(df_ES)
+
+
+```
+
+
+### United States
+```{r}
+
+#### United States ####
+
+setwd("../../Data/final/United States")
+
+UnitedStates <- read_csv("COVID-19_Vaccinations_in_the_United_States_County.csv")[c("Date", "FIPS", "Administered_Dose1_Recip_18Plus", "Recip_State")] %>%
+  rename(state = "Recip_State")
+
+pop <- read_csv("co-est2019-alldata.csv")[c("STATE", "COUNTY", "POPESTIMATE2019")] %>%
+  mutate(FIPS = gsub(" ", "", paste(STATE, COUNTY))) %>%
+  rename(pop = 3)
+
+US <- left_join(UnitedStates, pop) %>%
+  rename(vcum = 3) %>%
+  group_by(FIPS) %>%
+  mutate(date = as.Date(Date, "%m/%d/%Y")) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  filter(!is.na(pop), !is.na(FIPS), !is.na(vcum))
+
+
+##### United States, AZ #####
+
+AZ <- US %>% filter(state == "AZ")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LAZ <- Lc(AZ$vcum, AZ$pop, plot = F)
+GiniAZ <- Gini(AZ$vcum, AZ$pop, unbiased = F)
+
+
+df_AZ <- data.frame(LAZ$p,LAZ$L) %>%
+   rename(p = 1, L = 2) %>%
+   mutate(country = "United States, AZ") %>%
+  mutate(Gini = GiniAZ)
+  
+##### United States, LA #####  
+
+LA <- US %>% filter(state == "LA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LLA <- Lc(LA$vcum, LA$pop, plot = F)
+GiniLA <- Gini(LA$vcum, LA$pop, unbiased = F)
+
+
+df_LA <- data.frame(LLA$p,LLA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, LA") %>%
+  mutate(Gini = GiniLA)
+
+##### United States, FL #####
+
+FL <- US %>% filter(state == "FL")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LFL <- Lc(FL$vcum, FL$pop, plot = F)
+GiniFL <- Gini(FL$vcum, FL$pop, unbiased = F)
+
+
+df_FL <- data.frame(LFL$p,LFL$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, FL") %>%
+  mutate(Gini = GiniFL)
+
+##### United States, IN #####
+
+IN <- US %>% filter(state == "IN")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LIN <- Lc(IN$vcum, IN$pop, plot = F)
+GiniIN <- Gini(IN$vcum, IN$pop, unbiased = F)
+
+
+df_IN <- data.frame(LIN$p,LIN$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, IN") %>%
+  mutate(Gini = GiniIN)
+
+##### United States, MD #####
+
+MD <- US %>% filter(state == "MD")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMD <- Lc(MD$vcum, MD$pop, plot = F)
+GiniMD <- Gini(MD$vcum, MD$pop, unbiased = F)
+
+
+df_MD <- data.frame(LMD$p,LMD$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MD") %>%
+  mutate(Gini = GiniMD)
+
+##### United States, NY #####
+
+NY <- US %>% filter(state == "NY")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LNY <- Lc(NY$vcum, NY$pop, plot = F)
+GiniNY <- Gini(NY$vcum, NY$pop, unbiased = F)
+
+
+df_NY <- data.frame(LNY$p,LNY$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, NY") %>%
+  mutate(Gini = GiniNY)
+
+##### United States, TN #####
+
+TN <- US %>% filter(state == "TN")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LTN <- Lc(TN$vcum, TN$pop, plot = F)
+GiniTN <- Gini(TN$vcum, TN$pop, unbiased = F)
+
+
+df_TN <- data.frame(LTN$p,LTN$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, TN") %>%
+  mutate(Gini = GiniTN)
+
+
+##### United States, AK #####
+
+AK <- US %>% filter(state == "AK")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LAK <- Lc(AK$vcum, AK$pop, plot = F)
+GiniAK <- Gini(AK$vcum, AK$pop, unbiased = F)
+
+
+df_AK <- data.frame(LAK$p,LAK$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, AK") %>%
+  mutate(Gini = GiniAK)
+
+##### United States, AL #####
+
+AL <- US %>% filter(state == "AL")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LAL <- Lc(AL$vcum, AL$pop, plot = F)
+GiniAL <- Gini(AL$vcum, AL$pop, unbiased = F)
+
+
+df_AL <- data.frame(LAL$p,LAL$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, AL") %>%
+  mutate(Gini = GiniAL)
+
+##### United States, AR #####
+AR <- US %>% filter(state == "AR")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LAR <- Lc(AR$vcum, AR$pop, plot = F)
+GiniAR <- Gini(AR$vcum, AR$pop, unbiased = F)
+
+
+df_AR <- data.frame(LAR$p,LAR$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, AR") %>%
+  mutate(Gini = GiniAR)
+
+##### United States, CA #####
+CA <- US %>% filter(state == "CA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LCA <- Lc(CA$vcum, CA$pop, plot = F)
+GiniCA <- Gini(CA$vcum, CA$pop, unbiased = F)
+
+
+df_CA <- data.frame(LCA$p,LCA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, CA") %>%
+  mutate(Gini = GiniCA)
+
+##### United States, IA #####
+
+IA <- US %>% filter(state == "IA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LIA <- Lc(IA$vcum, IA$pop, plot = F)
+GiniIA <- Gini(IA$vcum, IA$pop, unbiased = F)
+
+
+df_IA <- data.frame(LIA$p,LIA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, IA") %>%
+  mutate(Gini = GiniIA)
+
+##### United States, ID #####
+
+ID <- US %>% filter(state == "ID")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LID <- Lc(ID$vcum, ID$pop, plot = F)
+GiniID <- Gini(ID$vcum, ID$pop, unbiased = F)
+
+
+df_ID <- data.frame(LID$p,LID$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, ID") %>%
+  mutate(Gini = GiniID)
+
+##### United States, MA #####
+
+MA <- US %>% filter(state == "MA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMA <- Lc(MA$vcum, MA$pop, plot = F)
+GiniMA <- Gini(MA$vcum, MA$pop, unbiased = F)
+
+
+df_MA <- data.frame(LMA$p,LMA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MA") %>%
+  mutate(Gini = GiniMA)
+
+##### United States, ME #####
+
+ME <- US %>% filter(state == "ME")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LME <- Lc(ME$vcum, ME$pop, plot = F)
+GiniME <- Gini(ME$vcum, ME$pop, unbiased = F)
+
+
+df_ME <- data.frame(LME$p,LME$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, ME") %>%
+  mutate(Gini = GiniME)
+
+##### United States, MN #####
+
+MN <- US %>% filter(state == "MN")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMN <- Lc(MN$vcum, MN$pop, plot = F)
+GiniMN <- Gini(MN$vcum, MN$pop, unbiased = F)
+
+
+df_MN <- data.frame(LMN$p,LMN$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MN") %>%
+  mutate(Gini = GiniMN)
+
+##### United States, MS #####
+
+MS <- US %>% filter(state == "MS")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMS <- Lc(MS$vcum, MS$pop, plot = F)
+GiniMS <- Gini(MS$vcum, MS$pop, unbiased = F)
+
+
+df_MS <- data.frame(LMS$p,LMS$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MS") %>%
+  mutate(Gini = GiniMS)
+
+##### United States, MT #####
+
+MT <- US %>% filter(state == "MT")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMT <- Lc(MT$vcum, MT$pop, plot = F)
+GiniMT <- Gini(MT$vcum, MT$pop, unbiased = F)
+
+
+df_MT <- data.frame(LMT$p,LMT$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MT") %>%
+  mutate(Gini = GiniMT)
+
+##### United States, ND ##### 
+
+ND <- US %>% filter(state == "ND")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LND <- Lc(ND$vcum, ND$pop, plot = F)
+GiniND <- Gini(ND$vcum, ND$pop, unbiased = F)
+
+
+df_ND <- data.frame(LND$p,LND$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, ND") %>%
+  mutate(Gini = GiniND)
+
+##### United States, NJ #####
+
+NJ <- US %>% filter(state == "NJ")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LNJ <- Lc(NJ$vcum, NJ$pop, plot = F)
+GiniNJ <- Gini(NJ$vcum, NJ$pop, unbiased = F)
+
+
+df_NJ <- data.frame(LNJ$p,LNJ$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, NJ") %>%
+  mutate(Gini = GiniNJ)
+
+##### United States, NV #####
+
+NV <- US %>% filter(state == "NV")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LNV <- Lc(NV$vcum, NV$pop, plot = F)
+GiniNV <- Gini(NV$vcum, NV$pop, unbiased = F)
+
+
+df_NV <- data.frame(LNV$p,LNV$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, NV") %>%
+  mutate(Gini = GiniNV)
+
+##### UNited States OK #####
+
+OK <- US %>% filter(state == "OK")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LOK <- Lc(OK$vcum, OK$pop, plot = F)
+GiniOK <- Gini(OK$vcum, OK$pop, unbiased = F)
+
+
+df_OK <- data.frame(LOK$p,LOK$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, OK") %>%
+  mutate(Gini = GiniOK)
+
+##### United States, OR #####
+
+OR <- US %>% filter(state == "OR")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LOR <- Lc(OR$vcum, OR$pop, plot = F)
+GiniOR <- Gini(OR$vcum, OR$pop, unbiased = F)
+
+
+df_OR <- data.frame(LOR$p,LOR$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, OR") %>%
+  mutate(Gini = GiniOR)
+
+##### United States, PA #####
+
+PA <- US %>% filter(state == "PA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LPA <- Lc(PA$vcum, PA$pop, plot = F)
+GiniPA <- Gini(PA$vcum, PA$pop, unbiased = F)
+
+
+df_PA <- data.frame(LPA$p,LPA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, PA") %>%
+  mutate(Gini = GiniPA)
+
+##### United States, SC ######
+
+uSC <- US %>% filter(state == "SC")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LuSC <- Lc(uSC$vcum, uSC$pop, plot = F)
+GiniuSC <- Gini(uSC$vcum, uSC$pop, unbiased = F)
+
+
+df_uSC <- data.frame(LuSC$p,LuSC$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, SC") %>%
+  mutate(Gini = GiniuSC)
+
+##### United States, VT #####
+
+VT <- US %>% filter(state == "VT")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LVT <- Lc(VT$vcum, VT$pop, plot = F)
+GiniVT <- Gini(VT$vcum, VT$pop, unbiased = F)
+
+
+df_VT <- data.frame(LVT$p,LVT$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, VT") %>%
+  mutate(Gini = GiniVT)
+
+##### United States, WA #####
+
+WA <- US %>% filter(state == "WA")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LWA <- Lc(WA$vcum, WA$pop, plot = F)
+GiniWA <- Gini(WA$vcum, WA$pop, unbiased = F)
+
+
+df_WA <- data.frame(LWA$p,LWA$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, WA") %>%
+  mutate(Gini = GiniWA)
+
+##### United States, WI #####
+
+WI <- US %>% filter(state == "WI")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LWI <- Lc(WI$vcum, WI$pop, plot = F)
+GiniWI <- Gini(WI$vcum,WI$pop, unbiased = F)
+
+
+df_WI <- data.frame(LWI$p,LWI$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, WI") %>%
+  mutate(Gini = GiniWI)
+
+##### United States, WY #####
+
+WY <- US %>% filter(state == "WY")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LWY <- Lc(WY$vcum, WY$pop, plot = F)
+GiniWY <- Gini(WY$vcum, WY$pop, unbiased = F)
+
+
+df_WY <- data.frame(LWY$p,LWY$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, WY") %>%
+  mutate(Gini = GiniWY)
+
+##### United States, IL #####
+
+IL <- US %>% filter(state == "IL")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LIL <- Lc(IL$vcum, IL$pop, plot = F)
+GiniIL <- Gini(IL$vcum, IL$pop, unbiased = F)
+
+
+df_IL <- data.frame(LIL$p,LIL$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, IL") %>%
+  mutate(Gini = GiniIL)
+
+##### United States, KS #####
+
+KS <- US %>% filter(state == "KS")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LKS <- Lc(KS$vcum, KS$pop, plot = F)
+GiniKS <- Gini(KS$vcum, KS$pop, unbiased = F)
+
+
+df_KS <- data.frame(LKS$p,LKS$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, KS") %>%
+  mutate(Gini = GiniKS)
+
+##### United States, MO #####
+
+MO <- US %>% filter(state == "MO")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LMO <- Lc(MO$vcum, MO$pop, plot = F)
+GiniMO <- Gini(MO$vcum, MO$pop, unbiased = F)
+
+
+df_MO <- data.frame(LMO$p,LMO$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, MO") %>%
+  mutate(Gini = GiniMO)
+
+##### United States, NC #####
+
+NC <- US %>% filter(state == "NC")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LNC <- Lc(NC$vcum, NC$pop, plot = F)
+GiniNC <- Gini(NC$vcum, NC$pop, unbiased = F)
+
+
+df_NC <- data.frame(LNC$p,LNC$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, NC") %>%
+  mutate(Gini = GiniNC)
+
+##### United States, KY #####
+
+KY <- US %>% filter(state == "KY")%>%
+  filter(-difftime(date, max(date), units = "days") <= 7)
+LKY <- Lc(KY$vcum, KY$pop, plot = F)
+GiniKY <- Gini(KY$vcum, KY$pop, unbiased = F)
+
+
+df_KY <- data.frame(LKY$p,LKY$L) %>%
+  rename(p = 1, L = 2) %>%
+  mutate(country = "United States, KY") %>%
+  mutate(Gini = GiniKY)
+
+
+df_US <- rbind(df_AZ, df_LA) %>%
+  rbind(df_FL) %>%
+  rbind(df_IN) %>%
+  rbind(df_MD) %>%
+  rbind(df_NY) %>%
+  rbind(df_TN) %>%
+  rbind(df_AK) %>%
+  rbind(df_AL) %>% 
+  rbind(df_AR) %>%
+  rbind(df_CA) %>%
+  rbind(df_IA) %>% 
+  rbind(df_ID) %>%
+  rbind(df_MA) %>%
+  rbind(df_ME) %>%
+  rbind(df_MN) %>%
+  rbind(df_MS) %>% 
+  rbind(df_MT) %>% 
+  rbind(df_ND) %>%
+  rbind(df_NJ) %>%
+  rbind(df_NV) %>%
+  rbind(df_OK) %>%
+  rbind(df_OR) %>%
+  rbind(df_PA) %>%
+  rbind(df_uSC) %>%
+  rbind(df_VT) %>%
+  rbind(df_WA) %>%
+  rbind(df_WI) %>%
+  rbind(df_WY) %>%
+  rbind(df_IL) %>%
+  rbind(df_KS) %>%
+  rbind(df_MO) %>%
+  rbind(df_NC) %>%
+  rbind(df_KY)
+
+
+```
+
+
+### rbind 
+```{r}
+
+#### rbind ####
+
+LorenzData <- rbind(df_Argentina, df_Bangladesh) %>%
+  rbind(df_Belgium) %>%
+  rbind(df_Chile) %>%
+  rbind(df_Colombia) %>%
+  rbind(df_CapeVerde) %>%
+  rbind(df_CzechRepublic) %>%
+  rbind(df_Ecuador) %>%
+  rbind(df_France) %>%
+  rbind(df_India) %>%
+  rbind(df_Germany) %>%
+  rbind(df_Israel) %>%
+  rbind(df_Italy) %>%
+  rbind(df_Japan) %>%
+  rbind(df_Kazakhstan) %>%
+  rbind(df_Korea) %>%
+  rbind(df_Malaysia) %>%
+  rbind(df_Norway) %>%
+  rbind(df_PuertoRico) %>%
+  rbind(df_Russia) %>%
+  rbind(df_Spain) %>%
+  rbind(df_Sweden) %>%
+  rbind(df_Turkey) %>%
+  rbind(df_Uruguay) %>%
+  rbind(df_US) %>%
+  rbind(df_Brazil)
+
+```
+
+
+### Peru 
+```{r}
+#### Peru ####
+setwd("../../Data/data_figures")
+
+## these were already all the same week. saved from cleaning code.
+df_Peru <- read_csv("../../Data/data_figures/LorenzPeru.csv")
+
+LorenzData <- rbind(LorenzData, df_Peru)
+
+```
+
+### write csv
+```{r}
+
+#### write csv ####
+write_csv(LorenzData, "../../Data/data_figures/LorenzData.csv")
+
+plot<- ggplot(data=LorenzData) +
+  geom_point(aes(x=p, y=L)) +
+  geom_line(aes(x=p, y=L), color="#990000") +
+  scale_x_continuous(name="Cumulative share of Population", limits=c(0,1)) + 
+  scale_y_continuous(name="Cumulative share of Vaccinations", limits=c(0,1)) +
+  geom_abline() + facet_wrap(~country)
+plot
+```
+
+## Max date analysis 
+
+### Group 2 (<100 locations)
+```{r}
+
+######### GROUP 2 ##########
+
+## load vaccine
+dataPR1 <- read_csv("../../Data/final/PR_Set_1.csv") %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>%
+  distinct()
+
+df <- dataPR1
+  
+dataBA1 <- read_csv("../../Data/final/BA_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataBA1)
+
+dataFr1 <- read_csv("../../Data/final/FR_Set_1.csv") %>%
+  filter(vaccine == "total", dose == "partial") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataFr1)
+
+dataTR1 <- read_csv("../../Data/final/TR_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataTR1)
+
+dataMy1 <- read_csv("../../Data/final/My_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataMy1)
+
+
+dataTW1 <- read_csv("../../Data/final/TW_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataTW1)
+
+
+dataJP1 <- read_csv("../../Data/final/JP_Set_1.csv") %>%
+  filter(dose == 1)  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataJP1)
+
+dataPal1 <- read_csv("../../Data/final/Pal_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(country = "Palestine") %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataPal1)
+
+
+dataKO1 <- read_csv("../../Data/final/KO_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataKO1)
+
+dataES1 <- read_csv("../../Data/final/ES_Set_1.csv") %>%
+  filter(dose == 1)  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataES1)
+
+dataSWI1 <- read_csv("../../Data/final/SWI_Set_1.csv") %>%
+  mutate(country = "Switzerland") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataSWI1)
+
+dataUR1 <- read_csv("../../Data/final/UR_Set_1.csv") %>%
+  mutate(country = "Uruguay") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataUR1)
+
+dataCO1 <- read_csv("../../Data/final/Colombia_Set2.csv")  %>%
+  mutate(country = "Colombia") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataCO1)
+## no dose information for Colombia
+
+dataIT1 <- read_csv("../../Data/final/IT_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataIT1)
+
+dataSW1 <- read_csv("../../Data/final/SW_Set_1.csv") %>%
+  filter(dose == "partial")  %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataSW1)
+
+
+dataSP1 <- read_csv("../../Data/final/SP_Set_1.csv") %>%
+  filter(dose == "partial")%>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataSP1)
+
+## load Kazakhstan
+
+dataKa <- read_csv("../../Data/final/Kaz_Set.csv") %>%
+  mutate(country = "Kazakhstan") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataKa)
+
+## load Israel
+
+dataIs <- read_csv("../../Data/final/IS_Set_1.csv") %>%
+  mutate(country = "Israel") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataIs)
+
+## load Argentina 
+
+dataAr <- read_csv("../../Data/final/AR_Set.csv") %>%
+  mutate(country = "Argentina") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataAr)
+
+## load Czechia
+
+dataCZ <- read_csv("../../Data/final/CZ_Set.csv") %>%
+  mutate(country = "Czech Republic") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataCZ)
+
+## load Cape Verde
+
+dataCV <- read_csv("../../Data/final/CV_Set.csv") %>%
+  mutate(country = "Cape Verde") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataCV)
+
+## norway
+
+dataNO <- read_csv("../../Data/final/NO_Set.csv") %>%
+  mutate(country = "Norway") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataNO)
+
+## denmark
+
+dataDK <- read_csv("../../Data/final/DK_Set.csv") %>%
+  mutate(country = "Denmark") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataDK)
+
+## Russia (83 locations)
+dataRU <- read_csv("../../Data/final/RU_Set_12.csv") %>%
+  filter(dose == "partial") %>%
+  rename(location = "region") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataRU)
+
+## all the same date for each state
+dataUS1 <- read_csv("../../Data/final/US_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  mutate(location = as.numeric(location)) %>%
+  ## group_by(state) %>%
+  mutate(maxdate = max(date)) %>%
+  summarise(country, maxdate) %>% 
+  ## ungroup() %>%
+  distinct()
+
+df <- df %>% rbind(dataUS1)
+
+
+```
+
+### Group 3 (>100 locations)
+```{r}
+
+######### Group 3 #########
+
+dataUK1 <- read_csv("../../Data/final/UK_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataUK1)
+
+dataGe1 <- read_csv("../../Data/final/GE_Set_1.csv") %>%
+  mutate(country = "Germany") %>%
+  filter(dose == 1) %>%
+  rename(pop = "Population") %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataGe1)
+
+## load Ecuador
+dataEc <- read_csv("../../Data/final/EC_canton.csv") %>%
+  mutate(country = "Ecuador") %>%
+  mutate(maxdate = max(as.Date(date, "%d/%m/%Y"), na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataEc)
+
+## load Chile
+dataCh1 <- read_csv("../../Data/final/ChileDose1.csv") %>%
+  mutate(country = "Chile") %>%
+  mutate(maxdate = max(Fecha, na.rm = T)) %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df <- df %>% rbind(dataCh1)
+
+dataBe1 <- read_csv("../../Data/final/Be_Set_1.csv") %>%
+  filter(dose == "partial") %>%
+  filter(year == max(year)) %>%
+  mutate(maxdate = max(week)) %>%
+  mutate(maxdate = "week 50, 2021") %>%
+  summarise(country, maxdate) %>% 
+  distinct()
+
+df2 <-dataBe1
+
+```
+
+### Brazil
+```{r}
+
+########### Brazil #########
+
+setwd("../../Data/final/Brazil/Finished sets")
+
+AC <- read_csv("BR_Set_1_AC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup()
+AL <- read_csv("BR_Set_1_AL.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AC)
+AM <- read_csv("BR_Set_1_AM.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AL)
+AP <- read_csv("BR_Set_1_AP_codetest.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AM)
+BA <- read_csv("BR_Set_1_BA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(AP)
+CE <- read_csv("BR_Set_1_CE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(BA)
+DF <- read_csv("BR_Set_1_DF.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(CE)
+ES <- read_csv("BR_Set_1_ES.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(DF)
+GO <- read_csv("BR_Set_1_GO.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(ES)
+MA <- read_csv("BR_Set_1_MA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(GO)
+MG <- read_csv("BR_Set_1_MG.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MA)
+MS <- read_csv("BR_Set_1_MS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MG)
+MT <- read_csv("BR_Set_1_MT.csv") %>%
+  filter(date >= as.Date("2021-01-17"))  %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MS)
+PA <- read_csv("BR_Set_1_PA.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(MT)
+PB <- read_csv("BR_Set_1_PB.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PA)
+PE <- read_csv("BR_Set_1_PE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PB)
+PI <- read_csv("BR_Set_1_PI.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PE)
+PR <- read_csv("BR_Set_1_PR.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PI)
+RN <- read_csv("BR_Set_1_RN.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(PR)
+RJ <- read_csv("BR_Set_1_RJ.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RN)
+RO <- read_csv("BR_Set_1_RO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RJ)
+RS <- read_csv("BR_Set_1_RS.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RO)
+SC <- read_csv("BR_Set_1_SC.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(RS)
+SE <- read_csv("BR_Set_1_SE.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SC)
+SP <- read_csv("BR_Set_1_SP.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SE)
+TO <- read_csv("BR_Set_1_TO.csv") %>%
+  filter(date >= as.Date("2021-01-17")) %>%
+  group_by(code, date, dose, state) %>%
+  summarise(vnum = sum(vnum, na.rm = T)) %>%
+  ungroup() %>%
+  rbind(SP)
+
+TO <- TO %>%
+  mutate(country = "Brazil") %>%
+  group_by(state) %>%
+  mutate(maxdate = max(date, na.rm = T)) %>%
+  summarise(state, country, maxdate) %>%
+  ungroup()  %>% 
+  distinct()
+
+dataBr <- TO %>% mutate(maxdate = "2022-05-24 / 2022-05-25") %>%
+  summarise(country, maxdate) %>%
+  distinct()
+
+df2 <- df2 %>% rbind(dataBr)
+
+## dates are all May 24/25 2022
+## TO <- TO %>% select(maxdate) %>% distinct()
+
+```
+
+### Finland
+```{r}
+######### finish these ones ##########
+
+setwd("../../Data/final/Finland")
+
+###### Southwest Finland #####
+SouthOstro <- read_csv("South Ostrobothnia Hospital District.csv")%>%
+  mutate(location = "South Ostrobothnia Hospital District") 
+Lansi <- read_csv("Lansi-Pohja Hospital District.csv")%>%
+  mutate(location = "Lansi-Pohja Hospital District") 
+NorthKar <- read_csv("North Karelia Hospital District.csv")%>%
+  mutate(location = "North Karelia Hospital District")
+SWFin <- read_csv("Southwest Finland Hospital District.csv")%>%
+  mutate(location = "Southwest Finland Hospital District") 
+Vaasa <- read_csv("Vaasa Hospital District.csv") %>%
+  mutate(location = "Vaasa Hospital District")
+Satakunta <- read_csv("Satakunta Hospital District.csv") %>%
+  mutate(location = "Satakunta Hospital District")
+Paijat <- read_csv("Paijat-Hame Hospital District.csv") %>%
+  mutate(location = "Paijat-Hame Hospital District")
+NorthSavo <- read_csv("North Savo Hospital District.csv") %>%
+  mutate(location = "North Savo Hospital District")
+NorthOstro <- read_csv("North Ostrobothnia Hospital District.csv") %>%
+  mutate(location = "North Ostrobothnia Hospital District")
+Pirkanmaa <- read_csv("Pirkanmaa Hospital District.csv") %>%
+  mutate(location = "Prikanmaa Hospital District")
+Lappi <- read_csv("Lappi Hospital District.csv") %>%
+  mutate(location = "Lappi Hospital District")
+Kymenlaakso <- read_csv("Kymenlaakso Hospital District.csv") %>%
+  mutate(location = "Kymenlaakso Hospital District")
+CentralFin <- read_csv("Central Finland Hospital District.csv") %>%
+  mutate(location = "Central Finland Hospital District")
+CentralOstro <- read_csv("Central Ostrobothnia Hospital District.csv") %>%
+  mutate(location = "Central Ostrobothnia Hospital District")
+Kanta <- read_csv("Kanta-Hame Hospital District.csv") %>%
+  mutate(location = "Kanta-Hame Hospital District")
+Kainuu <- read_csv("Kainuu Hospital District.csv") %>%
+  mutate(location = "Kainuu Hospital District")
+ItaSavo <- read_csv("Ita-Savo Hospital District.csv") %>%
+  mutate(location = "Ita-Savo Hospital District")
+Helsinki <- read_csv("Helsinki and Uusimaa Hospital District.csv") %>%
+  mutate(location = "Helsinki and Uusimaa Hospital District")
+SouthSavo <- read_csv("South Savo Hospital District.csv") %>%
+  mutate(location = "South Savo Hospital District")
+SouthKar <- read_csv("South Karelia Hospital District.csv") %>%
+  mutate(location = "South Karelia Hospital District")
+Aland <- read_csv("Aland.csv") %>%
+  mutate(location = "Aland")
+
+Set1 <- SWFin %>%
+  rbind(Vaasa) %>%
+  rbind(Satakunta) %>%
+  rbind(Paijat) %>%
+  rbind(NorthSavo) %>%
+  rbind(NorthOstro) %>%
+  rbind(Pirkanmaa) %>%
+  rbind(Lappi) %>%
+  rbind(Kymenlaakso) %>%
+  rbind(CentralFin) %>%
+  rbind(CentralOstro) %>%
+  rbind(Kanta) %>%
+  rbind(Kainuu) %>%
+  rbind(ItaSavo) %>%
+  rbind(Helsinki) %>%
+  rbind(SouthSavo) %>%
+  rbind(SouthKar) %>%
+  rbind(Aland) %>%
+  rbind(Lansi) %>%
+  rbind(SouthOstro) %>%
+  rbind(NorthKar)
+
+## max: year 2022 week 18
+
+dataFi <- SWFin %>% mutate(maxdate = "week 18, 2022") %>%
+  mutate(country = "Finland") %>%
+  summarise(country, maxdate) %>%
+  distinct()
+
+df2 <- df2 %>% rbind(dataFi) %>% distinct()
+
+``` 
+
+### India
+```{r}
+
+setwd("../../Data/final/India/time series")
+
+
+## load data ####
+fileNames <- list.files()
+dataName <- tibble(x = fileNames) %>% 
+  rowid_to_column("ID") %>%
+  mutate(x = str_remove(x, ".xlsx"))
+
+data1 <- tibble(NULL)
+for(i in 1:length(fileNames)){
+  temp <- read_excel(fileNames[i], sheet = "WeeklyVaccination") %>% 
+    mutate(ID = i) %>%
+    mutate(week = row_number()) %>%
+    left_join(dataName)
+  data1 <- data1 %>% bind_rows(temp)
+}
+
+dataIn <- data1 %>% filter(week == max(week)) %>%
+  mutate(country = "India") %>%
+  summarise(country, maxdate = label) %>%
+  distinct()
+
+df2 <- df2 %>% rbind(dataIn)
+
+
+write_csv(df, "../../Data/data_figures/datestable1.csv")
+write_csv(df2, "../../Data/data_figures/datestable2.csv")
+
+```
+
+
+## Fitting functional response 
+
+### function definition
+```{r}
+
+#### Functions definition ####
+'%!in%' <- function(x,y)!('%in%'(x,y))
+type_III_resp <- function (x, Vmax, WVH, h) {Vmax*(x^h)/((WVH^h) + (x^h))}
+type_III_resp_max <- function (x, WVH, h) {(x^h)/((WVH^h) + (x^h))}
+
+```
+
+### data input
+```{r}
+
+#### Data input ####
+dataT <- read_csv("../../Data/final/MasterData.csv", 
+                  col_types = cols (state = "c")) %>%
+  mutate(Name = case_when(is.na(state) ~ country, 
+         TRUE ~ paste(country, state, sep = ", ")),
+         value = value/100) %>% 
+  distinct() %>%  filter(!is.na(value), value <=1) %>% 
+  distinct() %>% pivot_wider(names_from = bin, values_from = value) %>%
+  mutate(metric = H-L/(H+L), difference = H-L, ratio = H/L) %>% filter(!is.na(metric)) %>%
+  group_by(Name,measure) %>% mutate(mean_diff = mean(difference)) %>%
+  ungroup() %>% group_by(Name) %>% 
+  filter(mean_diff == max(mean_diff, na.rm = T)) %>%
+  mutate(weeks_length = n_distinct(week)) %>% 
+  filter(weeks_length >= 15) %>% ungroup()
+
+write_csv(dataT,"../../Data/data_figures/dataT.csv")
+
+dataTstar <- read_csv("../../Data/final/MasterData.csv", 
+                  col_types = cols (state = "c")) %>%
+  mutate(Name = case_when(is.na(state) ~ country, 
+                          TRUE ~ paste(country, state, sep = ", ")),
+         value = value/100) %>% 
+  distinct() %>%  filter(!is.na(value), value <=1) %>% 
+  distinct() %>% pivot_wider(names_from = bin, values_from = value) %>%
+  mutate(metric = H-L/(H+L), difference = H-L, ratio = H/L) %>% filter(!is.na(metric)) %>%
+  group_by(Name,measure) %>% mutate(mean_diff = mean(difference)) %>%
+  ungroup() %>% group_by(Name) %>% 
+  filter(mean_diff == max(mean_diff, na.rm = T)) %>%
+  mutate(weeks_length = n_distinct(week)) %>% 
+  filter(weeks_length >= 0) %>% ungroup()
+write_csv(dataTstar,"../../Data/data_figures/dataTstar.csv")
+
+
+dataCont <- dataTstar %>% select(Name, continent) %>% distinct() 
+write_csv(dataCont,"../../Data/data_figures/dataCont.csv")
+
+
+Brazil <- dataT %>% filter(country == "Brazil") %>% select(Name) %>% distinct()
+
+```
+
+### Fitting Chile
+```{r}
+#### Fitting Chile ####
+dataTexamp <- dataT %>% filter(country == "Chile") %>%
+  select(week, H, L) %>% mutate(week = week - min(week)) %>% 
+  mutate(type = "observed")
+
+## High SES
+type_III_resp <- function (x, Vmax, WVH, h) {Vmax*(x^h)/((WVH^h) + (x^h))}
+type_III_resp_max <- function (x, WVH, h) {(x^h)/((WVH^h) + (x^h))}
+
+fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+            start=list(Vmax=0.5,WVH=15,h=1))
+outH <- summary(fitH)$coefficients[,1]
+if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+} else { 
+  fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+              start=list(WVH=outH["WVH"],h = outH["h"]))
+  VmaxH <- 1
+}
+outH <- summary(fitH)$coefficients[,1]
+WVHH <- outH["WVH"]
+hH <- outH["h"]
+
+## Low SES ##
+fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+            start=list(Vmax=0.5,WVH=15,h=1))
+outL <- summary(fitL)$coefficients[,1]
+
+if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+} else { 
+  fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+              start=list(WVH=outL["WVH"], h = outL["h"]))
+  VmaxL <- 1
+}
+outL <- summary(fitL)$coefficients[,1]
+WVHL <- outL["WVH"]
+hL <- outL["h"]
+
+
+dataTexamp <- dataTexamp %>% 
+  rbind(tibble(week = dataTexamp$week, H = predict(fitH),
+               L = predict(fitL), type = "predicted")) %>%
+  rbind(tibble(week = dataTexamp$week, H = predict(fitH),
+               L = predict(fitL), type = "VacMax"))
+
+#### WVH = week at which prop vaccinated is 0.5*MaxVac
+paramsTable <- rbind(
+  tibble(country = "Chile", SES = "H", MaxVac = aH, WVH = bH),
+  tibble(country = "Chile", SES = "L", MaxVac = aL, WVH = bL)
+  )
+
+plotFit <- dataTexamp %>% pivot_longer(cols = H:L, 
+        names_to = "SES", values_to = "PropV") %>%
+  ggplot(aes(week, PropV, col = SES)) + 
+  geom_point(data=. %>% filter(type == "observed"), size = 0.3) + 
+  labs(x="Week", y="Proportion vaccinated") + 
+  geom_line(data=. %>% filter(type == "predicted"), size = 0.75) + 
+  scale_color_manual(values = c("skyblue4", "goldenrod")) +
+  scale_x_continuous(breaks = seq(0,54,10)) + 
+  theme_classic() + theme(axis.text = element_text(color = "black"))
+plotFit
+
+```
+
+
+### Fit most countries
+```{r}
+
+dataTexampAll <- tibble(NULL)
+paramsTableAll <- tibble(NULL)
+
+#### Fitting most countries ####
+places <- read_csv("../../Data/countries_fitting.csv") %>%
+  filter(Fitting == 1) %>% 
+  filter(Name != "United States, WV") %>%
+  select(Name) %>% unlist() %>%
+  as.vector()
+places <- append(places, c("Japan","Germany", "Republic of Korea", "United States, CA", "United States, AZ", "United States, AR",
+                           "United States, SC", "United States, WI", "United States, MS","United States, IN",
+                             "United States, KY", 
+                            "United States, OK",
+                           "United States, PA", 
+                           "United States, MT",
+                           "United States, MD",
+                           "United States, MN",
+                           "United States, OR",
+                           "United States, MO",
+                           "United States, AK",
+                          "Estonia", "Finland", "Uruguay", "Switzerland", "Italy",
+                          "Brazil, AC", "Brazil, AL",
+                          "Brazil, AM", "Brazil, AP", 
+                          "Brazil, BA",
+                          "Brazil, ES", 
+                          "Brazil, GO", 
+                          "Brazil, MA",
+                          "Brazil, MS", "Brazil, MT", 
+                          "Brazil, PA",
+                          "Brazil, PB", "Brazil, PE", "Brazil, PI", "Brazil, PR", 
+                          "Brazil, RJ", 
+                          "Brazil, RO", "Brazil, RS",
+                          "Brazil, SC", "Brazil, SP", "Brazil, TO", "Kazakhstan",
+                          "Czech Republic", "India", "Denmark", "Sweden", "Spain"
+                          ))
+
+
+
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataT %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week - min(week)) %>% 
+    mutate(type = "observed")
+
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=1,WVH=15,h=2))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAll <- dataTexampAll %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAll <- paramsTableAll %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+```
+
+
+### Fit Israel
+```{r}
+########### fit Israel #############
+
+dataTexampAll2 <- tibble(NULL)
+paramsTableAll2 <- tibble(NULL)
+
+places <- c("Israel")
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataT %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week - min(week)) %>% 
+    mutate(type = "observed")
+  
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=1,WVH=5,h=2))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAll2 <- dataTexampAll2 %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAll2 <- paramsTableAll2 %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+
+```
+
+### Fit Cape Verde
+```{r}
+
+########### fit Cape Verde #############
+
+dataTexampAll3 <- tibble(NULL)
+paramsTableAll3 <- tibble(NULL)
+
+places <- c("Cape Verde")
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataT %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week-min(week)) %>% 
+    mutate(type = "observed")
+  
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=1,WVH=5,h=2))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAll3 <- dataTexampAll3 %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAll3 <- paramsTableAll3 %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+
+
+```
+
+
+### Fit some SA countries
+```{r}
+
+########### fit SA #############
+
+dataTexampAll4 <- tibble(NULL)
+paramsTableAll4 <- tibble(NULL)
+
+places <- c("Argentina", "Ecuador", "Brazil, SE", "Peru")
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataT %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week-min(week)) %>% 
+    mutate(type = "observed")
+  
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=0.75,WVH=25,h=3))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAll4 <- dataTexampAll4 %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAll4 <- paramsTableAll4 %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+
+
+```
+
+
+### Fit Brazil, RN, MG
+
+```{r}
+
+####### Fit Brazil RN, MG ######
+
+dataTexampAll5 <- tibble(NULL)
+paramsTableAll5 <- tibble(NULL)
+
+places <- c("Brazil, RN", "Brazil, MG")
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataT %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week-min(week)) %>% 
+    mutate(type = "observed")
+  
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=0.75,WVH=25,h=3))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAll5 <- dataTexampAll5 %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAll5 <- paramsTableAll5 %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+
+```
+
+
+### write csv 
+```{r}
+
+### write csv ####
+
+paramsTableAll <- rbind(paramsTableAll, paramsTableAll2) %>%
+  rbind(paramsTableAll3) %>%
+  rbind(paramsTableAll4) %>%
+  rbind(paramsTableAll5) %>%
+  left_join(dataCont) %>% distinct()
+dataTexampAll <- rbind(dataTexampAll, dataTexampAll2) %>%
+  rbind(dataTexampAll3) %>% 
+  rbind(dataTexampAll4) %>%
+  rbind(dataTexampAll5) %>%
+  distinct()
+
+write_csv(paramsTableAll,"../../Data/data_figures/paramsTable.csv")
+write_csv(dataTexampAll,"../../Data/data_figures/dataTexampAll.csv")
+
+```
+
+
+### classification
+```{r}
+
+### Classification ####
+
+# https://mclust-org.github.io/mclust/articles/mclust.html
+dataClass <- read_csv("../../Data/data_figures/paramsTable.csv") %>% 
+  select(MaxVac,WVH,h)
+dataGMM <- Mclust(dataClass, 2) 
+dataTexampAll <- read_csv("../../Data/data_figures/paramsTable.csv") %>%
+  mutate(Group = dataGMM$classification)
+
+tableH <- dataTexampAll %>% group_by(Name) %>% 
+  mutate(n = n_distinct(Group)) %>% 
+  ungroup %>% filter(n == 1) %>% group_by(SES,Group) %>%
+  summarise(mean_h = mean(h), median_h = median(h), 
+            max_h = max(h), min_h = min(h),
+            mean_MaxVac = mean(MaxVac), median_MaxVac = median(MaxVac), 
+            max_MaxVac = max(MaxVac), min_MaxVac = min(MaxVac),
+            mean_WVH = mean(WVH), median_WVH = median(WVH), 
+            max_WVH = max(WVH), min_WVH = min(WVH)) %>% ungroup() %>%
+  mutate(ID = row_number())
+
+write_csv(dataTexampAll,"../../Data/data_figures/paramsTable.csv")
+write_csv(tableH,"../../Data/data_figures/tableH.csv")
+
+```
+
+
+### vaccination rates averages
+```{r}
+##### vaccination rates averages ####
+ 
+tableH <- read_csv("../../Data/data_figures/tableH.csv")
+datOut <- tibble(NULL)
+for(i in 1:4){
+  dataT <- tableH %>% filter(ID == i)
+  datOut <- rbind(datOut, tibble(ID = i, Week = 1:60, 
+                  Vac = type_III_resp(1:60, dataT$mean_MaxVac, 
+                        dataT$mean_WVH, dataT$mean_h)))
+}
+datOut <- datOut %>% left_join(tableH %>% 
+              select(ID,SES,Group,mean_MaxVac,mean_WVH,mean_h))
+
+write_csv(datOut, "../../Data/data_figures/dataOut.csv")
+
+# plotOut <- datOut %>% ggplot() +  
+#   geom_line(aes(x=Week, y = Vac, col = SES)) + 
+#   geom_hline(aes(yintercept = mean_MaxVac, col = SES), lty=2) + 
+#   labs(x="Week", y="Proportion vaccinated") + 
+#   scale_color_manual(values = c("skyblue4", "goldenrod")) +
+#   scale_x_continuous(breaks = seq(0,60,10)) + 
+#   scale_y_continuous(breaks = seq(0,1,0.2), limits = c(0,1)) + 
+#   facet_wrap(~Group, scales = "free",nrow = 1) + theme_minimal() + 
+#   geom_segment(aes(x = 0,y = mean_MaxVac*0.5,xend = mean_WVH,
+#                    yend = mean_MaxVac*0.5, col = SES), lty=3)+ 
+#   geom_segment(aes(x = mean_WVH,y = 0,xend = mean_WVH,
+#                    yend = mean_MaxVac*0.5, col = SES), lty=3)+ 
+#   theme(axis.text = element_text(color = "black"),
+#         axis.line = element_line(color= "black"),
+#         axis.ticks = element_line(color= "black"))
+
+
+```
+
+### fit US and BRazil for Gini 
+```{r}
+
+#### fit US and Brazil for GINI analysis ####
+
+dataTspecial <- read_csv("../../Data/data_figures/BrazilUSGiniAggregate.csv") %>%
+  mutate(Name = country,
+         value = value/100) %>% 
+  distinct() %>%  filter(!is.na(value), value <=1) %>% 
+  distinct() %>% pivot_wider(names_from = bin, values_from = value) %>%
+  mutate(metric = H-L/(H+L), difference = H-L, ratio = H/L) %>% filter(!is.na(metric)) %>%
+  group_by(Name,measure) %>% mutate(mean_diff = mean(difference)) %>%
+  ungroup() %>% group_by(Name) %>% 
+  filter(mean_diff == max(mean_diff, na.rm = T)) %>%
+  mutate(weeks_length = n_distinct(week)) %>% 
+  filter(weeks_length >= 15) %>% ungroup()
+
+dataTexampAllspecial <- tibble(NULL)
+paramsTableAllspecial <- tibble(NULL)
+
+places <- c("United States", "Brazil")
+
+for(place in places){
+  cat(place, "\n")
+  dataTexamp <- dataTspecial %>% filter(Name == place) %>%
+    select(Name, week, H, L) %>% mutate(week = week-min(week)) %>% 
+    mutate(type = "observed")
+  
+  ## High SES
+  fitH <- nls(H~type_III_resp(week,Vmax, WVH, h),data=dataTexamp, 
+              start=list(Vmax=1,WVH=15,h=2))
+  outH <- summary(fitH)$coefficients[,1]
+  if (outH["Vmax"] <= 1) { VmaxH <- outH["Vmax"]
+  } else { 
+    fitH <- nls(H~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outH["WVH"],h = outH["h"]))
+    VmaxH <- 1
+  }
+  outH <- summary(fitH)$coefficients[,1]
+  
+  ## Low SES ##
+  fitL <- nls(L~type_III_resp(week,Vmax, WVH, h),data=dataTexamp,
+              start=list(Vmax=VmaxH,WVH=outH["WVH"],h=outH["h"]))
+  outL <- summary(fitL)$coefficients[,1]
+  
+  if (outL["Vmax"] <= 1) { VmaxL <- outL["Vmax"]
+  } else { 
+    fitL <- nls(L~type_III_resp_max(week,WVH,h),data=dataTexamp, 
+                start=list(WVH=outL["WVH"], h = outL["h"]))
+    VmaxL <- 1
+  }
+  outL <- summary(fitL)$coefficients[,1]
+  
+  dataTexampAllspecial <- dataTexampAllspecial %>% rbind(dataTexamp) %>% 
+    rbind(tibble(Name = dataTexamp$Name, week = dataTexamp$week, 
+                 H = predict(fitH),L = predict(fitL), 
+                 type = "predicted")) 
+  
+  paramsTableAllspecial <- paramsTableAllspecial %>% rbind(
+    tibble(Name = place, SES = "H", MaxVac = VmaxH, 
+           WVH = outH["WVH"], h = outH["h"]),
+    tibble(Name = place, SES = "L", MaxVac = VmaxL, 
+           WVH = outL["WVH"], h = outL["h"]))
+}
+
+
+write_csv(dataTexampAllspecial,"../../Data/data_figures/BrUSGini.csv")
+write_csv(paramsTableAllspecial,"../../Data/data_figures/BrUSGiniParam.csv")
+
+
+```
+
+
+### classification whole US and BRazil
+```{r}
+
+#### Classification whole US, Brazil ####
+Testing <- paramsTableAllspecial %>%
+  mutate(continent = if_else(Name == "Brazil", "South America", "North America")) %>%
+  rbind(paramsTableAll) %>% 
+  filter(substr(Name, 1,14) != "United States,") %>%
+  filter(substr(Name, 1,7)!= "Brazil,")
+
+dataClass <- Testing %>% 
+  select(MaxVac,WVH,h)
+dataGMM <- Mclust(dataClass, 2) 
+dataTexampAllspecial <- Testing %>%
+  mutate(Group = dataGMM$classification)
+
+hplotSupp <-  dataTexampAllspecial %>% select(Name, SES, h, Group) %>% 
+  distinct() %>% pivot_wider(names_from = SES, values_from = h) %>% 
+  mutate(Group = as_factor(Group)) %>% ggplot(aes(x = H, y = L)) + 
+  labs(title = "Shape of functional response (k)") + 
+  geom_density_2d(colour = "gray90",bins = 5, size = 0.3) + 
+  geom_abline(intercept = 0, slope = 1, size = 0.75, lty=2, col = "gray70") + 
+  geom_point(aes(col = Group), size = 2.5, alpha = 0.5) + theme_classic() +
+  #  geom_label(aes(x=1.56,y=1.56, label = "X"), col = "darkcyan", size = 2,
+  #            label.padding = unit(0.08, "lines"),fontface = "bold") +
+  #  geom_label(aes(x=3.24,y=3.24, label = "X"), col = "darkblue", size = 2,
+  #            label.padding = unit(0.08, "lines"),fontface = "bold") + 
+  scale_color_manual(values = c("darkblue", "darkcyan")) + coord_fixed() + 
+  scale_x_continuous(" ", expand = c(0,0), limits = c(0,5.62)) + 
+  scale_y_continuous("Low SES", expand = c(0,0), limits = c(0,5.62)) + 
+  theme(axis.text = element_text(color = "black", size = 9),
+        axis.line = element_line(color = "black", size = 0.5),
+        axis.ticks = element_line(color = "black", size = 0.5),
+        legend.position = "none", aspect.ratio = 1,
+        strip.background = element_rect(colour=NA, fill=NA),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10,
+                                    margin = margin(r = -7)),
+        plot.title = element_text(colour = "black", size = 10))
+hplotSupp
+
+
+write_csv(dataTexampAllspecial,"../../Data/data_figures/paramsTableSupp.csv")
+
+```
+

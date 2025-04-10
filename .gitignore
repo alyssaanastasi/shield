@@ -1,0 +1,10 @@
+# Data Files #
+*.csv
+
+# Images # 
+*.png
+
+# R configs #
+.Rhistory
+.RData
+.DS_Store

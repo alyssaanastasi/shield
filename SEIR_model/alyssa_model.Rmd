@@ -182,23 +182,25 @@ times <- 1:420
 vaccC <- function(t){0}
 vaccCA <- function(t){0}
 vaccP <- function(t){0}
+vaccS <- function(t){0}
 
 outNoVac <- ode(y=init, func = seir, times=times, parms = parms) %>% 
   as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
   mutate(name = fct_relevel(name, names(init)),
          type = "No vaccination") %>%
   mutate(group = case_when(
-      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2|Inf_C1|^Inf_C2", name) ~ "Children",
-      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA|Inf_CA", name) ~ "Childless Adults",
-      grepl("^S_P|^E_P|^I_P|^R_P|^D_P|Inf_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
   )) %>%
     mutate(label = case_when(
       grepl("^S_.*1$", name) ~ "Susceptible (First)",
       grepl("^S_.*2$", name) ~ "Susceptible (Second)",
       grepl("^E_.*1$", name) ~ "Exposed (First)",
       grepl("^E_.*2$", name) ~ "Exposed (Second)",
-      grepl("^Inf_.*1$", name) ~ "Infected (First)",
-      grepl("^Inf_.*2$", name) ~ "Infected (Second)",
+      grepl("^I_.*1$", name) ~ "Infected (First)",
+      grepl("^I_.*2$", name) ~ "Infected (Second)",
       grepl("^R_.*1$", name) ~ "Recovered (First)",
       grepl("^R_.*2$", name) ~ "Recovered (Second)",
       grepl("^D_.*1$", name) ~ "Dead (First)",

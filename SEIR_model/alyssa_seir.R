@@ -28,6 +28,12 @@ seir <- function(t, y, pars){
   ss <- pars["ss"] # scale susceptibility -> people who have already had covid are less susceptible
   si <- pars["si"] # scale infectiousness -> people with immunity are less infectious
   
+  # Set up Population Parameters
+  # Source: 2020 Census Data
+  percentAdult <- 5398257/12812508
+  percentParent <- (883257+109092+70752+265126)/4998395
+  percentAdultParent <- percentParent / percentAdult
+  
   # State variables:
   # 4 groups: Children, Adults with Kids, Adults without Kids, Seniors 
   # Children 
@@ -94,58 +100,76 @@ seir <- function(t, y, pars){
   # force of infection: 
   # Lambda = Child to Adult contact * mu * prop of adults infected
   lambdaC <- mu*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
-  lambdaCA <- mu*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumS/popS)
-  lambdaP <- mu*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumS/popS)
+  lambdaCA <- mu*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
+  lambdaP <- mu*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
   lambdaS <- mu*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
   
+  #Aging Rates
+  deltaCA <- 1/(18*365) # aging rate from child to adult
+  deltaAS <- 1/(32*365) # aging rate from adult to senior
+  deltaSC <- 1/(30*365) # aging rate from senior to child (birth rate?)
+    
   ## Updates
   #child updates
-  dS_C1 <- -(lambdaC + vaccC(t))*S_C1
-  dE_C1 <- lambdaC*S_C1 - (epsilon + vaccC(t))*E_C1
-  dI_C1 <- epsilon*E_C1 - gamma*I_C1
-  dR_C1 <- gamma*I_C1 - (omega + vaccC(t))*R_C1
+  dS_C1 <- -(lambdaC + vaccC(t))*S_C1 - deltaCA*S_C1 + deltaSC*(S_S1+E_S1+I_S1+R_S1+S_S2+E_S2+I_S2+R_S2)
+  dE_C1 <- lambdaC*S_C1 - (epsilon + vaccC(t))*E_C1 - deltaCA*E_C1 
+  dI_C1 <- epsilon*E_C1 - gamma*I_C1 - (deltaCA)*I_C1 
+  dR_C1 <- gamma*I_C1 - (omega + vaccC(t))*R_C1 - (deltaCA)*R_C1 
   dD_C1 <- alphaC1*gamma*I_C1
-  dS_C2 <- omega*R_C1 + b*omega*R_C2 - (ss*lambdaC + vaccC(t))*S_C2
-  dE_C2 <- ss*lambdaC*S_C2 - (epsilon + vaccC(t))*E_C2
-  dI_C2 <- epsilon*E_C2 - gamma*I_C2
-  dR_C2 <- vaccC(t)*(S_C1 + E_C1 + R_C1 + S_C2 + E_C2) +
-    gamma*I_C2 - b*omega*R_C2
+  dS_C2 <- omega*R_C1 + b*omega*R_C2 - (ss*lambdaC + vaccC(t))*S_C2 - (deltaCA)*S_C2 
+  dE_C2 <- ss*lambdaC*S_C2 - (epsilon + vaccC(t))*E_C2 - (deltaCA)*E_C2
+  dI_C2 <- epsilon*E_C2 - gamma*I_C2 - (deltaCA)*I_C2
+  dR_C2 <- vaccC(t)*(S_C1 + E_C1 + R_C1 + S_C2 + E_C2) + gamma*I_C2 - b*omega*R_C2 - (deltaCA)*R_C2
   dD_C2 <- alphaC2*gamma*I_C2
   
   
   # childless adults updates
-  dS_CA1 <- -(lambdaCA + vaccCA(t)) * S_CA1
-  dE_CA1 <- lambdaCA* S_CA1 - (epsilon + vaccCA(t)) * E_CA1
-  dI_CA1 <- epsilon * E_CA1 - gamma * I_CA1
-  dR_CA1 <- gamma * I_CA1 - (omega + vaccCA(t)) * R_CA1
+  dS_CA1 <- -(lambdaCA + vaccCA(t)) * S_CA1 + (deltaCA * (1-percentAdultParent))*S_C1 - (deltaAS)*S_CA1
+  dE_CA1 <- lambdaCA* S_CA1 - (epsilon + vaccCA(t)) * E_CA1 + (deltaCA * (1-percentAdultParent))*E_C1 - (deltaAS)*E_CA1
+  dI_CA1 <- epsilon * E_CA1 - gamma * I_CA1 + (deltaCA * (1-percentAdultParent))*I_C1 - (deltaAS)*I_CA1
+  dR_CA1 <- gamma * I_CA1 - (omega + vaccCA(t)) * R_CA1 + (deltaCA * (1-percentAdultParent))*R_C1 - (deltaAS)*R_CA1
   dD_CA1 <- alphaCA1 * gamma * I_CA1
-  dS_CA2 <- omega * R_CA1 + b * omega * R_CA2 - (ss * lambdaCA + vaccCA(t)) * S_CA2
-  dE_CA2 <- ss * lambdaCA * S_CA2 - (epsilon + vaccCA(t)) * E_CA2
-  dI_CA2 <- epsilon * E_CA2 - gamma * I_CA2
-  dR_CA2 <- vaccCA(t) * (S_CA1 + E_CA1 + R_CA1 + S_CA2 + E_CA2) +
-    gamma * I_CA2 - b * omega * R_CA2
+  dS_CA2 <- omega * R_CA1 + b * omega * R_CA2 - (ss * lambdaCA + vaccCA(t)) * S_CA2 + (deltaCA * (1-percentAdultParent))*S_C2 - (deltaAS)*S_CA2
+  dE_CA2 <- ss * lambdaCA * S_CA2 - (epsilon + vaccCA(t)) * E_CA2 + (deltaCA * (1-percentAdultParent))*E_C2 - (deltaAS)*E_CA2
+  dI_CA2 <- epsilon * E_CA2 - gamma * I_CA2 + (deltaCA * (1-percentAdultParent))*I_C2 - (deltaAS)*I_CA2
+  dR_CA2 <- vaccCA(t) * (S_CA1 + E_CA1 + R_CA1 + S_CA2 + E_CA2) + gamma * I_CA2 - b * omega * R_CA2 + (deltaCA * (1-percentAdultParent))*R_C2 - (deltaAS)*R_CA2
   dD_CA2 <- alphaCA2 * gamma * I_CA2
   
+  #parent updates
+  dS_P1 <- -(lambdaP + vaccP(t)) * S_P1 + (deltaCA * percentAdultParent)*S_C1 - (deltaAS)*S_P1
+  dE_P1 <- lambdaP * S_P1 - (epsilon + vaccP(t)) * E_P1 + (deltaCA * percentAdultParent)*E_C1 - (deltaAS)*E_P1
+  dI_P1 <- epsilon * E_P1 - gamma * I_P1 + (deltaCA * percentAdultParent)*I_C1 - (deltaAS)*I_P1
+  dR_P1 <- gamma * I_P1 - (omega + vaccP(t)) * R_P1 + (deltaCA * percentAdultParent)*R_C1 - (deltaAS)*R_P1
+  dD_P1 <- alphaP1 * gamma * I_P1
+  dS_P2 <- omega * R_P1 + b * omega * R_P2 - (ss * lambdaP + vaccP(t)) * S_P2 + (deltaCA * percentAdultParent)*S_C2 - (deltaAS)*S_P2
+  dE_P2 <- ss * lambdaP * S_P2 - (epsilon + vaccP(t)) * E_P2 + (deltaCA * percentAdultParent)*E_C2 - (deltaAS)*E_P2
+  dI_P2 <- epsilon * E_P2 - gamma * I_P2 + (deltaCA * percentAdultParent)*I_C2 - (deltaAS)*I_P2
+  dR_P2 <- vaccP(t) * (S_P1 + E_P1 + R_P1 + S_P2 + E_P2) + gamma * I_P2 - b * omega * R_P2 + (deltaCA * percentAdultParent)*R_C2 - (deltaAS)*R_P2
+  dD_P2 <- alphaP2 * gamma * I_P2
+  
+  
   # senior updates
-  dS_S1 <- -(lambdaS + vaccS(t)) * S_S1
-  dE_S1 <- lambdaS * S_S1 - (epsilon + vaccS(t)) * E_S1
-  dI_S1 <- epsilon * E_S1 - gamma * I_S1
-  dR_S1 <- gamma * I_S1 - (omega + vaccS(t)) * R_S1
+  dS_S1 <- -(lambdaS + vaccS(t)) * S_S1 + (deltaAS)*(S_CA1 + S_P1) - (deltaSC)*S_S1
+  dE_S1 <- lambdaS * S_S1 - (epsilon + vaccS(t)) * E_S1 + (deltaAS)*(E_CA1 + E_P1) - (deltaSC)*E_S1
+  dI_S1 <- epsilon * E_S1 - gamma * I_S1 + (deltaAS)*(I_CA1 + S_P1) - (deltaSC)*I_S1
+  dR_S1 <- gamma * I_S1 - (omega + vaccS(t)) * R_S1 + (deltaAS)*(R_CA1 + R_P1) - (deltaSC)*R_S1
   dD_S1 <- alphaS1 * gamma * I_S1
-  dS_S2 <- omega * R_S1 + b * omega * R_S2 - (ss * lambdaS + vaccS(t)) * S_S2
-  dE_S2 <- ss * lambdaS * S_S2 - (epsilon + vaccS(t)) * E_S2
-  dI_S2 <- epsilon * E_S2 - gamma * I_S2
-  dR_S2 <- vaccS(t) * (S_S1 + E_S1 + R_S1 + S_S2 + E_S2) +
-    gamma * I_S2 - b * omega * R_S2
+  dS_S2 <- omega * R_S1 + b * omega * R_S2 - (ss * lambdaS + vaccS(t)) * S_S2 + (deltaAS)*(S_CA2 + S_P2) - (deltaSC)*S_S2
+  dE_S2 <- ss * lambdaS * S_S2 - (epsilon + vaccS(t)) * E_S2 + (deltaAS)*(E_CA2 + E_P2) - (deltaSC)*E_S2
+  dI_S2 <- epsilon * E_S2 - gamma * I_S2 + (deltaAS)*(I_CA2 + I_P2) - (deltaSC)*I_S2
+  dR_S2 <- vaccS(t) * (S_S1 + E_S1 + R_S1 + S_S2 + E_S2) + gamma * I_S2 - b * omega * R_S2 + (deltaAS)*(R_CA2 + R_P2) - (deltaSC)*R_S2
   dD_S2 <- alphaS2 * gamma * I_S2
   
   # Return list of gradients
   list(c(dS_C1, dE_C1, dI_C1, dR_C1, dD_C1,
-         dS_C2, dE_C2, dI_C2, dR_C2, dD_C2,
-         dS_CA1, dE_CA1, dI_CA1, dR_CA1, dD_CA1,
-         dS_CA2, dE_CA2, dI_CA2, dR_CA2, dD_CA2,
-         dS_S1, dE_S1, dI_S1, dR_S1, dD_S1,
-         dS_S2, dE_S2, dI_S2, dR_S2, dD_S2))
+        dS_C2, dE_C2, dI_C2, dR_C2, dD_C2,
+        dS_CA1, dE_CA1, dI_CA1, dR_CA1, dD_CA1,
+        dS_CA2, dE_CA2, dI_CA2, dR_CA2, dD_CA2,
+        dS_P1, dE_P1, dI_P1, dR_P1, dD_P1,
+        dS_P2, dE_P2, dI_P2, dR_P2, dD_P2,
+        dS_S1, dE_S1, dI_S1, dR_S1, dD_S1,
+        dS_S2, dE_S2, dI_S2, dR_S2, dD_S2))
+  
 }
 
 #### Type III functional response ####

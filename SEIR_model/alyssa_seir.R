@@ -5,17 +5,15 @@ library(tidyverse)
 
 seir <- function(t, y, pars){
   # Parameters
-  epsilon <- pars["epsilon"]  # rate of infection (how long it takes to move from e to i)
+  epsilon <- pars["epsilon"]  # how long it takes to move from e to i
   omega <- pars["omega"] # waning of immunity 
-  b <- pars["b"]
+  b <- pars["b"] # immunity scalar
   mu <- pars["mu"]  # probability of transition given contact
   gamma <- pars["gamma"] # recovery rate for asymptomatic
-  alphaC1 <- pars["alphaC1"] # infection-induced death rate
+  alphaC1 <- pars["alphaC1"] # infection-induced death rate for children
   alphaC2 <- pars["alphaC2"]
-  alphaCA1 <- pars["alphaCA1"]
-  alphaCA2 <- pars["alphaCA2"]
-  alphaP1 <- pars["alphaP1"]
-  alphaP2 <- pars["alphaP2"]
+  alphaA1 <- pars["alphaA1"] #infection induced death rate for adults (both parents and CA)
+  alphaA2 <- pars["alphaA2"]
   alphaS1 <- pars["alphaS1"]
   alphaS2 <- pars["alphaS2"]
   cCC <- pars["cCC"] # contact between children 
@@ -29,7 +27,7 @@ seir <- function(t, y, pars){
   si <- pars["si"] # scale infectiousness -> people with immunity are less infectious
   
   # Set up Population Parameters
-  # Source: 2020 Census Data
+  # Source: Illinois 2020 Census Data
   percentAdult <- 5398257/12812508
   percentParent <- (883257+109092+70752+265126)/4998395
   percentAdultParent <- percentParent / percentAdult
@@ -128,24 +126,24 @@ seir <- function(t, y, pars){
   dE_CA1 <- lambdaCA* S_CA1 - (epsilon + vaccCA(t)) * E_CA1 + (deltaCA * (1-percentAdultParent))*E_C1 - (deltaAS)*E_CA1
   dI_CA1 <- epsilon * E_CA1 - gamma * I_CA1 + (deltaCA * (1-percentAdultParent))*I_C1 - (deltaAS)*I_CA1
   dR_CA1 <- gamma * I_CA1 - (omega + vaccCA(t)) * R_CA1 + (deltaCA * (1-percentAdultParent))*R_C1 - (deltaAS)*R_CA1
-  dD_CA1 <- alphaCA1 * gamma * I_CA1
+  dD_CA1 <- alphaA1 * gamma * I_CA1
   dS_CA2 <- omega * R_CA1 + b * omega * R_CA2 - (ss * lambdaCA + vaccCA(t)) * S_CA2 + (deltaCA * (1-percentAdultParent))*S_C2 - (deltaAS)*S_CA2
   dE_CA2 <- ss * lambdaCA * S_CA2 - (epsilon + vaccCA(t)) * E_CA2 + (deltaCA * (1-percentAdultParent))*E_C2 - (deltaAS)*E_CA2
   dI_CA2 <- epsilon * E_CA2 - gamma * I_CA2 + (deltaCA * (1-percentAdultParent))*I_C2 - (deltaAS)*I_CA2
   dR_CA2 <- vaccCA(t) * (S_CA1 + E_CA1 + R_CA1 + S_CA2 + E_CA2) + gamma * I_CA2 - b * omega * R_CA2 + (deltaCA * (1-percentAdultParent))*R_C2 - (deltaAS)*R_CA2
-  dD_CA2 <- alphaCA2 * gamma * I_CA2
+  dD_CA2 <- alphaA2 * gamma * I_CA2
   
   #parent updates
   dS_P1 <- -(lambdaP + vaccP(t)) * S_P1 + (deltaCA * percentAdultParent)*S_C1 - (deltaAS)*S_P1
   dE_P1 <- lambdaP * S_P1 - (epsilon + vaccP(t)) * E_P1 + (deltaCA * percentAdultParent)*E_C1 - (deltaAS)*E_P1
   dI_P1 <- epsilon * E_P1 - gamma * I_P1 + (deltaCA * percentAdultParent)*I_C1 - (deltaAS)*I_P1
   dR_P1 <- gamma * I_P1 - (omega + vaccP(t)) * R_P1 + (deltaCA * percentAdultParent)*R_C1 - (deltaAS)*R_P1
-  dD_P1 <- alphaP1 * gamma * I_P1
+  dD_P1 <- alphaA1 * gamma * I_P1
   dS_P2 <- omega * R_P1 + b * omega * R_P2 - (ss * lambdaP + vaccP(t)) * S_P2 + (deltaCA * percentAdultParent)*S_C2 - (deltaAS)*S_P2
   dE_P2 <- ss * lambdaP * S_P2 - (epsilon + vaccP(t)) * E_P2 + (deltaCA * percentAdultParent)*E_C2 - (deltaAS)*E_P2
   dI_P2 <- epsilon * E_P2 - gamma * I_P2 + (deltaCA * percentAdultParent)*I_C2 - (deltaAS)*I_P2
   dR_P2 <- vaccP(t) * (S_P1 + E_P1 + R_P1 + S_P2 + E_P2) + gamma * I_P2 - b * omega * R_P2 + (deltaCA * percentAdultParent)*R_C2 - (deltaAS)*R_P2
-  dD_P2 <- alphaP2 * gamma * I_P2
+  dD_P2 <- alphaA2 * gamma * I_P2
   
   
   # senior updates

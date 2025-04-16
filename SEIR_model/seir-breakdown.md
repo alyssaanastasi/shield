@@ -4,8 +4,8 @@
 
 ### Parameters
 
--   $\epsilon$: Rate of Infection (How long it takes to move from Exposed to Infected)
--   $\omega$: Waning of Immunity
+-   $\epsilon$: latent period
+-   $\omega$: waning of immunity
 -   $b$:
 -   $\mu$: probability of transition given contact
 -   $\gamma$: recovery rate for asymptomatic

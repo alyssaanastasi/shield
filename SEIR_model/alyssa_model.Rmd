@@ -8,7 +8,6 @@ date: "`r format(Sys.time(), '%B %Y')`"
 ---
 
 ## Setup
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(deSolve)
@@ -21,27 +20,30 @@ library(RColorBrewer)
 library(MetBrewer)
 library(ggrepel)
 library(spatstat.utils)
+library(paletteer)
 source("alyssa_seir.R")
 source("alyssa_SEIR_params.R")
 ```
 
+
+## Time Parms
+```{r}
+times <- 1:730
+```
+
 ## No vaccination
 
-### Time & Vacc Parms
+### COVID
 ```{r}
-times <- 1:420
 vaccC <- function(t){0}
 vaccCA <- function(t){0}
 vaccP <- function(t){0}
 vaccS <- function(t){0}
-```
 
-### COVID 
-```{r}
-COVIDoutNoVac <- ode(y=init, func = seir, times=times, parms = covid_parms) %>% 
+COVIDNoVac <- ode(y=init, func = seir, times=times, parms = covid_parms) %>% 
   as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
   mutate(name = fct_relevel(name, names(init)),
-         type = "No vaccination") %>%
+         type = "No Vaccination") %>%
   mutate(group = case_when(
       grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
       grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
@@ -62,22 +64,161 @@ COVIDoutNoVac <- ode(y=init, func = seir, times=times, parms = covid_parms) %>%
   ))
 
 
-COVIDplotNoVac <- COVIDoutNoVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+COVIDplotNoVac <- COVIDNoVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  facet_wrap(~group, scales = "free", ncol = 1)
+  ggtitle("COVID-19 - No Vaccination") + 
+  facet_wrap(~group, scales = "free", ncol = 2) +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+```
 
+
+```{r}
+ggsave("COVIDNoVac.png", width = 10, height = 7, dpi = 300)
+COVIDplotNoVac
+```
+### Flu
+```{R}
+vaccC <- function(t){0}
+vaccCA <- function(t){0}
+vaccP <- function(t){0}
+vaccS <- function(t){0}
+
+FLUNoVac <- ode(y=init, func = seir, times=times, parms = flu_parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(name = fct_relevel(name, names(init)),
+         type = "No Vaccination") %>%
+  mutate(group = case_when(
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
+  )) %>%
+    mutate(label = case_when(
+      grepl("^S_.*1$", name) ~ "Susceptible (First)",
+      grepl("^S_.*2$", name) ~ "Susceptible (Second)",
+      grepl("^E_.*1$", name) ~ "Exposed (First)",
+      grepl("^E_.*2$", name) ~ "Exposed (Second)",
+      grepl("^I_.*1$", name) ~ "Infected (First)",
+      grepl("^I_.*2$", name) ~ "Infected (Second)",
+      grepl("^R_.*1$", name) ~ "Recovered (First)",
+      grepl("^R_.*2$", name) ~ "Recovered (Second)",
+      grepl("^D_.*1$", name) ~ "Dead (First)",
+      grepl("^D_.*2$", name) ~ "Dead (Second)"
+  ))
+
+FLUplotNoVac <- FLUNoVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scales = "free", ncol = 2) +
+  ggtitle("Flu - No Vaccination") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+```
+
+```{r}
+ggsave("FluNoVac.png", width = 10, height = 7, dpi = 300)
+FLUplotNoVac
+```
+
+## Current US Vacc Rates
+
+### COVID 
+```{r}
+# setting these off the US values reported in our science advances paper
+WVH <- 15 ## week at which half the maximum coverage is reached
+k <- 1.75 ## "shape" of vaccine trends (sigmoidal vs concave)
+
+## adding max coverage levels for each age group
+vaccC <- vacc_weekly(0.559, WVH, k)
+vaccCA <- vacc_weekly(0.73, WVH, k)
+vaccP <- vacc_weekly(0.758, WVH, k)
+vaccS <- vacc_weekly(0.858, WVH, k)
+
+## now this will run the SEIR code and automatically pull these functions into the SEIR
+COVIDCurrVac <- ode(y=init, func = seir, times=times, parms = covid_parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(name = fct_relevel(name, names(init)),
+         type = "Current Vaccination") %>%
+  mutate(group = case_when(
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
+  )) %>%
+    mutate(label = case_when(
+      grepl("^S_.*1$", name) ~ "Susceptible (First)",
+      grepl("^S_.*2$", name) ~ "Susceptible (Second)",
+      grepl("^E_.*1$", name) ~ "Exposed (First)",
+      grepl("^E_.*2$", name) ~ "Exposed (Second)",
+      grepl("^I_.*1$", name) ~ "Infected (First)",
+      grepl("^I_.*2$", name) ~ "Infected (Second)",
+      grepl("^R_.*1$", name) ~ "Recovered (First)",
+      grepl("^R_.*2$", name) ~ "Recovered (Second)",
+      grepl("^D_.*1$", name) ~ "Dead (First)",
+      grepl("^D_.*2$", name) ~ "Dead (Second)"
+  ))
+COVIDplotCurrVac <- COVIDCurrVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scales = "free", ncol = 2) +
+  ggtitle("COVID - Current Vaccination Rates") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
 ```
 
 ```{R}
-COVIDplotNoVac
+ggsave("COVIDCurrVac.png", width = 10, height = 7, dpi = 300)
+COVIDplotCurrVac
 ```
 
 ### Flu
 ```{R}
-FLUoutNoVac <- ode(y=init, func = seir, times=times, parms = flu_parms) %>% 
+WVH <- 15
+k <- 1.75
+vaccC <- vacc_weekly(0.531, WVH, k)
+vaccCA <- vacc_weekly(0.356, WVH, k)
+vaccP <- vacc_weekly(0.477, WVH, k)
+vaccS <- vacc_weekly(0.599, WVH, k)
+
+FLUCurrVac <- ode(y=init, func = seir, times=times, parms = flu_parms) %>% 
   as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
   mutate(name = fct_relevel(name, names(init)),
-         type = "No vaccination") %>%
+         type = "Current Vaccination") %>%
   mutate(group = case_when(
       grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
       grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
@@ -97,13 +238,282 @@ FLUoutNoVac <- ode(y=init, func = seir, times=times, parms = flu_parms) %>%
       grepl("^D_.*2$", name) ~ "Dead (Second)"
   ))
 
-
-FLUplotNoVac <- FLUoutNoVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+FLUplotCurrVac <- FLUCurrVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  facet_wrap(~group, scales = "free", ncol = 1)
+  facet_wrap(~group, scales = "free", ncol = 2) +
+  ggtitle("Flu - Current Vaccination Rates") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+```
 
+
+```{R}
+ggsave("FluCurrVac.png", width = 10, height = 7, dpi = 300)
+FLUplotCurrVac
+```
+
+
+## Same Coverage Scenario
+
+### COVID
+
+```{R}
+## adding max coverage levels for each age group
+vaccC <- vacc_weekly(0.75, WVH, k)
+vaccCA <- vacc_weekly(0.73, WVH, k)
+vaccP <- vacc_weekly(0.758, WVH, k)
+vaccS <- vacc_weekly(0.858, WVH, k)
+
+## now this will run the SEIR code and automatically pull these functions into the SEIR
+COVIDBestVac <- ode(y=init, func = seir, times=times, parms = covid_parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(name = fct_relevel(name, names(init)),
+         type = "Same Vaccination") %>%
+  mutate(group = case_when(
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
+  )) %>%
+    mutate(label = case_when(
+      grepl("^S_.*1$", name) ~ "Susceptible (First)",
+      grepl("^S_.*2$", name) ~ "Susceptible (Second)",
+      grepl("^E_.*1$", name) ~ "Exposed (First)",
+      grepl("^E_.*2$", name) ~ "Exposed (Second)",
+      grepl("^I_.*1$", name) ~ "Infected (First)",
+      grepl("^I_.*2$", name) ~ "Infected (Second)",
+      grepl("^R_.*1$", name) ~ "Recovered (First)",
+      grepl("^R_.*2$", name) ~ "Recovered (Second)",
+      grepl("^D_.*1$", name) ~ "Dead (First)",
+      grepl("^D_.*2$", name) ~ "Dead (Second)"
+  ))
+
+COVIDplotBestVac <- COVIDBestVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scales = "free", ncol = 2) +
+  ggtitle("COVID-19 - Same Vaccination Coverage Scenario") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
 ```
 
 ```{R}
-FLUplotNoVac
+ggsave("COVIDBestVac.png", width = 10, height = 7, dpi = 300)
+COVIDplotBestVac
+```
+
+### Flu
+```{r}
+WVH <- 15
+k <- 1.75
+vaccC <- vacc_weekly(0.531, WVH, k)
+vaccCA <- vacc_weekly(0.531, WVH, k)
+vaccP <- vacc_weekly(0.531, WVH, k)
+vaccS <- vacc_weekly(0.599, WVH, k)
+
+FLUBestVac <- ode(y=init, func = seir, times=times, parms = flu_parms) %>% 
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+  mutate(name = fct_relevel(name, names(init)),
+         type = "Same Vaccination") %>%
+  mutate(group = case_when(
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
+  )) %>%
+    mutate(label = case_when(
+      grepl("^S_.*1$", name) ~ "Susceptible (First)",
+      grepl("^S_.*2$", name) ~ "Susceptible (Second)",
+      grepl("^E_.*1$", name) ~ "Exposed (First)",
+      grepl("^E_.*2$", name) ~ "Exposed (Second)",
+      grepl("^I_.*1$", name) ~ "Infected (First)",
+      grepl("^I_.*2$", name) ~ "Infected (Second)",
+      grepl("^R_.*1$", name) ~ "Recovered (First)",
+      grepl("^R_.*2$", name) ~ "Recovered (Second)",
+      grepl("^D_.*1$", name) ~ "Dead (First)",
+      grepl("^D_.*2$", name) ~ "Dead (Second)"
+  ))
+
+FLUplotBestVac <- FLUBestVac %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scales = "free", ncol = 2) + 
+  ggtitle("Flu - Same Coverage Scenario") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 10),
+        legend.text = element_text(colour = "black", size = 9),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+```
+
+```{r}
+ggsave("FluBestVac.png", width = 10, height = 7, dpi = 300)
+FLUplotBestVac
+```
+
+## Infection Curves
+
+### COVID-19
+```{R}
+# make new dataframe with infections for each group
+COVIDout <- rbind(COVIDNoVac, COVIDCurrVac, COVIDBestVac) 
+# filter so only infections
+COVIDoutGrouped <- COVIDout %>% filter(str_starts(name, "I_")) %>%
+            group_by(time, type, group) %>%
+            summarise(infections = sum(value))
+
+COVIDoutGrouped$type <- factor(COVIDoutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
+```
+
+```{R}
+COVIDplotInfections60 <- COVIDoutGrouped %>% filter(time < 60) %>%
+  ggplot(aes(x=time,y=infections, color=type)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  scale_color_paletteer_d("palettetown::suicune") +
+  facet_wrap(~group, ncol = 2) +
+  ggtitle("COVID-19 Infections (60 Days)")  +  
+  labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
+  theme_bw() +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 9),
+        legend.text = element_text(colour = "black", size = 8),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+
+ggsave("COVIDplotInfections60.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections60
+```
+```{R}
+COVIDplotInfections <- COVIDoutGrouped %>% filter(time < 500) %>%
+  ggplot(aes(x=time,y=infections, color=type)) + 
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  scale_color_paletteer_d("palettetown::suicune") +
+  facet_wrap(~group, ncol = 2) +
+  ggtitle("COVID-19 Infections (420 days)")  +  
+  labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
+  theme_bw() +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 9),
+        legend.text = element_text(colour = "black", size = 8),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+
+ggsave("COVIDplotInfections.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections
+
+```
+
+### Flu
+```{R}
+# make new dataframe with infections for each group
+FLUout <- rbind(FLUNoVac, FLUCurrVac, FLUBestVac) 
+# filter so only infections
+FLUoutGrouped <- FLUout %>% filter(str_starts(name, "I_")) %>%
+            group_by(time, type, group) %>%
+            summarise(infections = sum(value))
+
+FLUoutGrouped$type <- factor(FLUoutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
+```
+
+```{R}
+FLUplotInfections60 <- FLUoutGrouped %>% filter(time < 60) %>%
+  ggplot(aes(x=time,y=infections, color=type)) +
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scale="free", ncol = 2) +
+  ggtitle("Flu Infections (60 days)") + 
+  labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
+  theme_bw() +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 9),
+        legend.text = element_text(colour = "black", size = 8),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+
+ggsave("FLUplotInfections60.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections60
+```
+```{R}
+FLUplotInfections <- FLUoutGrouped %>% filter(time < 500) %>%
+  ggplot(aes(x=time,y=infections, color=type)) +
+  geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
+  facet_wrap(~group, scale="free", ncol = 2) +
+  ggtitle("Flu Infections (420 Days)") + 
+  labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
+  theme_bw() +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 9),
+        legend.text = element_text(colour = "black", size = 8),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+
+ggsave("FLUplotInfections.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections
+
 ```

@@ -152,7 +152,7 @@ library(svglite)
 ## Wave 1 - cleaning
 
 ```{r}
-survey_wave1 <- read_csv("data/Health Behavior and Demographics - Fielding_December 4, 2024_13.23.csv") 
+survey_wave1 <- read_csv("../data/Health Behavior and Demographics - Fielding_December 4, 2024_13.23.csv") 
 
 finished <- survey_wave1 %>%
   filter(StartDate!= "Start Date", substr(StartDate,0,1) != "{") %>%
@@ -875,31 +875,31 @@ plot_survey_data_proportion_new <- function(qstn, plot_title, age_grp, demograph
   # ))}
   if (nrow(df2) > 0) {
     plot_out <- df2 %>%
-      ggplot(aes(x = age_cat, y = response_counter, fill = !!sym(demographic))) +
-      stat_summary(fun.data = mean_cl_normal, geom = "bar", position = "dodge") +
-      stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = "dodge") +
+      ggplot(aes(x = age_cat, y = response_counter, fill = !!sym(demographic))) + 
+      stat_summary(aes(), fun.data = mean_cl_normal, geom = "bar", position = "dodge") +
+      stat_summary(aes(), fun.data = mean_cl_normal, geom = "errorbar", position = "dodge") +
       geom_text(data = chi_results, aes(x = 1, y = 1.1, label = label), inherit.aes = FALSE, size = 2.5) +
-      scale_fill_manual(
-        name = paste("Self-reported", demographic),
-        values = named_colors$colors
-      ) +
-      scale_y_continuous(
-        "Response rate",
-        labels = scales::percent,
-        expand = expansion(mult = c(0.05, 0.2))
-      ) +
-      xlab("Response") +
+      scale_fill_manual(name = paste("Self-reported", demographic), values = named_colors$colors) + 
+      scale_y_continuous("Response rate",labels = scales::percent, expand = expansion(mult = c(0.05, 0.2))) + xlab("Response") +
       theme_minimal() +
       ggtitle(plot_title, age_grp) +
-      facet_wrap(~response, strip.position = "bottom", labeller = label_wrap_gen()) +
-      theme(
-        axis.text = element_text(size = 11, color = "black"),
-        axis.title = element_text(size = 12, color = "black"),
-        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
-        legend.position = "right",
-        legend.text = element_text(size = 10),
-        legend.title = element_text(size = 12, face = "bold")
-      )
+      facet_wrap(~response, strip.position = c("bottom"), labeller = label_wrap_gen()) +
+      theme(axis.text = element_text(size = 11, color = "black"),
+           axis.title = element_text(size = 12, color = "black"),
+           axis.line = element_blank(),
+           axis.ticks = element_line(color = "black"),
+           axis.ticks.x = element_blank(),
+           axis.text.x = element_blank(),
+           plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+           plot.title.position = "plot",
+           plot.subtitle = element_text(colour = "black", size = 12.5),
+           plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm"),
+           legend.position = "right",
+           legend.margin=margin(1,1.5,0.5,0.5,unit = "line"),
+           strip.text = element_text(colour = "black", size = 10.5, hjust = 0),
+           strip.background = element_rect(colour="white", fill="white"),
+           panel.border = element_rect(colour = "black", fill=NA),
+           panel.spacing = unit(0.5, "cm"), aspect.ratio=0.5) 
     plot_out
     
     plot_save_path <- paste("./Survey_Analysis_Figures/figure_demographic_new/",plot_title,"_", age_grp,"_", demographic,".jpg", sep = "")

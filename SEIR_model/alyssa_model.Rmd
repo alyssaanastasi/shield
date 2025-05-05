@@ -271,8 +271,8 @@ FLUplotCurrVac
 
 ```{R}
 ## adding max coverage levels for each age group
-vaccC <- vacc_weekly(0.75, WVH, k)
-vaccCA <- vacc_weekly(0.73, WVH, k)
+vaccC <- vacc_weekly(0.758, WVH, k)
+vaccCA <- vacc_weekly(0.758, WVH, k)
 vaccP <- vacc_weekly(0.758, WVH, k)
 vaccS <- vacc_weekly(0.858, WVH, k)
 
@@ -400,7 +400,7 @@ COVIDoutGrouped$type <- factor(COVIDoutGrouped$type, levels=c('No Vaccination', 
 COVIDplotInfections60 <- COVIDoutGrouped %>% filter(time < 60) %>%
   ggplot(aes(x=time,y=infections, color=type)) + 
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  scale_color_paletteer_d("palettetown::suicune") +
+  scale_color_paletteer_d("rockthemes::muse") +
   facet_wrap(~group, ncol = 2) +
   ggtitle("COVID-19 Infections (60 Days)")  +  
   labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
@@ -415,7 +415,7 @@ COVIDplotInfections60 <- COVIDoutGrouped %>% filter(time < 60) %>%
         plot.margin = unit(c(0, 0, 0, 0), "cm"),
         legend.title = element_text(colour = "black", size = 9),
         legend.text = element_text(colour = "black", size = 8),
-        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
         strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))
@@ -427,9 +427,9 @@ COVIDplotInfections60
 COVIDplotInfections <- COVIDoutGrouped %>% filter(time < 500) %>%
   ggplot(aes(x=time,y=infections, color=type)) + 
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  scale_color_paletteer_d("palettetown::suicune") +
+  scale_color_paletteer_d("rockthemes::muse") +
   facet_wrap(~group, ncol = 2) +
-  ggtitle("COVID-19 Infections (420 days)")  +  
+  ggtitle("COVID-19 Infections (500 days)")  +  
   labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
   theme_bw() +
   theme(axis.text = element_text(size = 11, color = "black"),
@@ -442,7 +442,7 @@ COVIDplotInfections <- COVIDoutGrouped %>% filter(time < 500) %>%
         plot.margin = unit(c(0, 0, 0, 0), "cm"),
         legend.title = element_text(colour = "black", size = 9),
         legend.text = element_text(colour = "black", size = 8),
-        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
         strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))
@@ -468,7 +468,8 @@ FLUoutGrouped$type <- factor(FLUoutGrouped$type, levels=c('No Vaccination', 'Cur
 FLUplotInfections60 <- FLUoutGrouped %>% filter(time < 60) %>%
   ggplot(aes(x=time,y=infections, color=type)) +
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  facet_wrap(~group, scale="free", ncol = 2) +
+  scale_color_paletteer_d("rockthemes::muse") +
+  facet_wrap(~group, ncol = 2) +
   ggtitle("Flu Infections (60 days)") + 
   labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
   theme_bw() +
@@ -482,7 +483,7 @@ FLUplotInfections60 <- FLUoutGrouped %>% filter(time < 60) %>%
         plot.margin = unit(c(0, 0, 0, 0), "cm"),
         legend.title = element_text(colour = "black", size = 9),
         legend.text = element_text(colour = "black", size = 8),
-        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
         strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))
@@ -494,8 +495,9 @@ FLUplotInfections60
 FLUplotInfections <- FLUoutGrouped %>% filter(time < 500) %>%
   ggplot(aes(x=time,y=infections, color=type)) +
   geom_line() + # geom_text(data=subset(outNoVac, time == max(time)-100), aes(label=label), hjust=-0.1, vjust=-0.5, size=3) + 
-  facet_wrap(~group, scale="free", ncol = 2) +
-  ggtitle("Flu Infections (420 Days)") + 
+  scale_color_paletteer_d("rockthemes::muse") +
+  facet_wrap(~group, ncol = 2) +
+  ggtitle("Flu Infections (500 Days)") + 
   labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
   theme_bw() +
   theme(axis.text = element_text(size = 11, color = "black"),
@@ -508,7 +510,7 @@ FLUplotInfections <- FLUoutGrouped %>% filter(time < 500) %>%
         plot.margin = unit(c(0, 0, 0, 0), "cm"),
         legend.title = element_text(colour = "black", size = 9),
         legend.text = element_text(colour = "black", size = 8),
-        strip.text = element_text(colour = "black", size = 11, hjust = 0.5),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
         strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))

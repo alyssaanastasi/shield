@@ -5,26 +5,30 @@ library(tidyverse)
 
 seir <- function(t, y, pars){
   # Parameters
-  epsilon <- pars["epsilon"]  # how long it takes to move from e to i
-  omega <- pars["omega"] # waning of immunity 
-  b <- pars["b"] # immunity scalar
-  mu <- pars["mu"]  # probability of transition given contact
-  gamma <- pars["gamma"] # recovery rate for asymptomatic
-  alphaC1 <- pars["alphaC1"] # infection-induced death rate for children
-  alphaC2 <- pars["alphaC2"]
-  alphaA1 <- pars["alphaA1"] #infection induced death rate for adults (both parents and CA)
-  alphaA2 <- pars["alphaA2"]
-  alphaS1 <- pars["alphaS1"]
-  alphaS2 <- pars["alphaS2"]
-  cCC <- pars["cCC"] # contact between children 
-  cCCA <- pars["cCCA"] # contact between children and childless adults
-  cCP <- pars["cCP"] # contact between children and adults with children
-  cCS <- pars["cCS"] # contact between seniors and children
-  cAA <- pars["cAA"] # contact between adults
-  cSA <- pars["cSA"] # contact between seniors and adults
-  cSS <- pars["cSS"] # contact between seniors
-  ss <- pars["ss"] # scale susceptibility -> people who have already had covid are less susceptible
-  si <- pars["si"] # scale infectiousness -> people with immunity are less infectious
+  epsilon <- pars$epsilon[1]  # how long it takes to move from e to i
+  omega <- pars$omega[1] # waning of immunity 
+  b <- pars$b[1] # immunity scalar
+  mu <- pars$mu[1]  # probability of transition given contact
+  gamma <- pars$gamma[1] # recovery rate for asymptomatic
+  alphaC1 <- pars$alphaC1[1] # infection-induced death rate for children
+  alphaC2 <- pars$alphaC2[1] 
+  alphaA1 <- pars$alphaA1[1] #infection induced death rate for adults (both parents and CA)
+  alphaA2 <- pars$alphaA2[1]
+  alphaS1 <- pars$alphaS1[1]
+  alphaS2 <- pars$alphaS2[1]
+  cCC <- pars$cCC[1] # contact between children 
+  cCCA <- pars$cCCA[1] # contact between children and childless adults
+  cCP <- pars$cCP[1] # contact between children and adults with children
+  cCS <- pars$cCS[1] # contact between seniors and children
+  cAA <- pars$cAA[1] # contact between adults
+  cSA <- pars$cSA[1] # contact between seniors and adults
+  cSS <- pars$cSS[1] # contact between seniors
+  ss <- pars$ss[1] # scale susceptibility -> people who have already had covid are less susceptible
+  si <- pars$si[1] # scale infectiousness -> people with immunity are less infectious
+  vaccC <- pars$vaccC
+  vaccCA <- pars$vaccCA
+  vaccP <- pars$vaccP
+  vaccS <- pars$vaccS
   
   # Set up Population Parameters
   # Source: Illinois 2020 Census Data
@@ -81,7 +85,6 @@ seir <- function(t, y, pars){
   I_S2 <- y[38]
   R_S2 <- y[39]
   D_S2 <- y[40]
-  
   
   # Group totals
   sumIC <- I_C1 + si*I_C2

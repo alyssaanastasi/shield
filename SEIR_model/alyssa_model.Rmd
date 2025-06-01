@@ -57,14 +57,17 @@ run_ode <- function(init, seir, times, parms, vacc_type, disease) {
       grepl("^R_.*2$", name) ~ "Recovered (Second)",
       grepl("^D_.*1$", name) ~ "Dead (First)",
       grepl("^D_.*2$", name) ~ "Dead (Second)"
-  ))
+  )) %>%
+    group_by(time, group) %>%
+    mutate(proportion = value / sum(value)) %>%
+    ungroup()
   return(df)
 }
 ```
 
 ## Plot Functions
 ```{R}
-full_plot <- function(df, title)
+full_plot <- function(df, title) {
   df %>% drop_na(label) %>% ggplot(aes(x=time,y=value, color=label)) + 
   geom_line() + 
   facet_wrap(~group, scales = "free", ncol = 2) +
@@ -83,6 +86,7 @@ full_plot <- function(df, title)
         strip.background = element_rect(colour="gray95", fill="gray95"),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))
+}
 
 infection_plot <- function(df, title, max_time) {
   if (is.null(max_time)) {
@@ -94,7 +98,35 @@ infection_plot <- function(df, title, max_time) {
   scale_color_paletteer_d("MoMAColors::Andri") +
   facet_wrap(~group, ncol = 2) +
   ggtitle(title) + 
-  labs(x = "Time (Days)", y = "Infections", color = "Vaccination Coverage") + 
+  labs(x = "Time (Days)", y = "Infections (Count)", color = "Vaccination Coverage") + 
+  theme_bw() +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        legend.key.width=unit(0.3,"cm"),
+        legend.key.height =unit(0.6,"cm"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.title = element_text(colour = "black", size = 9),
+        legend.text = element_text(colour = "black", size = 8),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="gray95", fill="gray95", linetype=1),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm"))
+}
+
+infection_plot_prop <- function(df, title, max_time) {
+  if (is.null(max_time)) {
+    max_time = max(times) + 1
+  }
+  df %>% filter(time < max_time) %>%
+  ggplot(aes(x=time, y=proportion, color=type)) +
+  geom_line() + 
+  scale_color_paletteer_d("MoMAColors::Andri") +
+  facet_wrap(~group, ncol = 2) +
+  ggtitle(title) + 
+  labs(x = "Time (Days)", y = "Infections (Proportion)", color = "Vaccination Coverage") + 
   theme_bw() +
   theme(axis.text = element_text(size = 11, color = "black"),
         axis.title = element_text(size = 12, color = "black"),
@@ -124,30 +156,53 @@ set_vacc <- function(disease, type) {
     vaccCA <- function(t){0}
     vaccP <- function(t){0}
     vaccS <- function(t){0}
-  } else if (disease == "COVID-19" && type == "Current Vaccination") {
-    vaccC <- vacc_weekly(0.559, WVH, k)
-    vaccCA <- vacc_weekly(0.73, WVH, k)
-    vaccP <- vacc_weekly(0.758, WVH, k)
-    vaccS <- vacc_weekly(0.858, WVH, k)
-  } else if (disease == "COVID-19" && type == "Same Vaccination") {
-    vaccC <- vacc_weekly(0.758, WVH, k)
-    vaccCA <- vacc_weekly(0.758, WVH, k)
-    vaccP <- vacc_weekly(0.758, WVH, k)
-    vaccS <- vacc_weekly(0.858, WVH, k)
-  } else if (disease == "Flu" && type == "Current Vaccination") {
-    vaccC <- vacc_weekly(0.531, WVH, k)
-    vaccCA <- vacc_weekly(0.356, WVH, k)
-    vaccP <- vacc_weekly(0.477, WVH, k)
-    vaccS <- vacc_weekly(0.599, WVH, k)
-  } else if (disease == "Flu" && type == "Same Vaccination") {
-    vaccC <- vacc_weekly(0.531, WVH, k)
-    vaccCA <- vacc_weekly(0.531, WVH, k)
-    vaccP <- vacc_weekly(0.531, WVH, k)
-    vaccS <- vacc_weekly(0.599, WVH, k)
+  } else if (type == "Current Vaccination") {
+      if (disease == "COVID-19") {
+        vaccC <- vacc_weekly(0.642, WVH, k)
+        vaccCA <- vacc_weekly(0.697, WVH, k)
+        vaccP <- vacc_weekly(0.697, WVH, k)
+        vaccS <- vacc_weekly(0.863, WVH, k)
+      } else if (disease == "Flu") {
+        vaccC <- vacc_weekly(0.597, WVH, k)
+        vaccCA <- vacc_weekly(0.367, WVH, k)
+        vaccP <- vacc_weekly(0.491, WVH, k)
+        vaccS <- vacc_weekly(0.613, WVH, k)
+      } else if (disease == "RSV") {
+        vaccC <- vacc_weekly(0.468, WVH, k)
+        vaccCA <- vacc_weekly(0, WVH, k)
+        vaccP <- vacc_weekly(0, WVH, k)
+        vaccS <- vacc_weekly(0, WVH, k)
+      } else if (disease == "Pertussis") {
+        vaccC <- vacc_weekly(0.86, WVH, k)
+        vaccCA <- vacc_weekly(0, WVH, k)
+        vaccP <- vacc_weekly(0, WVH, k)
+        vaccS <- vacc_weekly(0, WVH, k)
+      }
+  } else if (type == "Same Vaccination") {
+    if (disease == "COVID-19") {
+        vaccC <- vacc_weekly(0.697, WVH, k)
+        vaccCA <- vacc_weekly(0.697, WVH, k)
+        vaccP <- vacc_weekly(0.697, WVH, k)
+        vaccS <- vacc_weekly(0.863, WVH, k)
+    } else if (disease == "Flu") {
+        vaccC <- vacc_weekly(0.597, WVH, k)
+        vaccCA <- vacc_weekly(0.597, WVH, k)
+        vaccP <- vacc_weekly(0.597, WVH, k)
+        vaccS <- vacc_weekly(0.613, WVH, k)
+    } else if (disease == "RSV") {
+        vaccC <- vacc_weekly(0.468, WVH, k)
+        vaccCA <- vacc_weekly(0.468, WVH, k)
+        vaccP <- vacc_weekly(0.468, WVH, k)
+        vaccS <- vacc_weekly(0.468, WVH, k)
+    } else if (disease == "Pertussis") {
+        vaccC <- vacc_weekly(0.86, WVH, k)
+        vaccCA <- vacc_weekly(0.86, WVH, k)
+        vaccP <- vacc_weekly(0.86, WVH, k)
+        vaccS <- vacc_weekly(0.86, WVH, k)
+    }
   }
   return(c(vaccC = vaccC, vaccCA = vaccCA, vaccP = vaccP, vaccS = vaccS))
 }
-
 ```
 
 ### COVID
@@ -196,11 +251,15 @@ COVIDoutGrouped$type <- factor(COVIDoutGrouped$type, levels=c('No Vaccination', 
 ```
 
 ```{R}
-COVIDplotInfections60 <- infection_plot(COVIDoutGrouped, "COVID-19 Infections (60 days)", 60)
-ggsave("figures/COVIDplotInfections60.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections60ct <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (60 days)", 60)
+ggsave("figures/COVIDplotInfections60ct.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections60prop <- infection_plot_prop(COVIDoutGrouped, "COVID-19 Infections Proportion (60 days)", 60)
+ggsave("figures/COVIDplotInfections60prop.png", width = 10, height = 7, dpi = 300)
 
-COVIDplotInfections <- infection_plot(COVIDoutGrouped, "COVID-19 Infections (500 days)", NULL)
-ggsave("figures/COVIDplotInfections.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (500 days)", NULL)
+ggsave("figures/COVIDplotInfectionsct.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfectionsprop <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Proportion (500 days)", NULL)
+ggsave("figures/COVIDplotInfectionsprop.png", width = 10, height = 7, dpi = 300)
 ```
 
 

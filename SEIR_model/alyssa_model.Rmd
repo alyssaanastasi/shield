@@ -26,9 +26,24 @@ source("alyssa_SEIR_params.R")
 ```
 
 
-## Time Parms
+## Basic Parms
 ```{r}
-times <- 1:500
+times <- 1:2192
+PopT <- 1.2*10^7 ## 20 million total
+
+percentAdult <- 5398257/12812508
+percentParent <- (883257+109092+70752+265126)/4998395
+percentAdultParent <- percentParent / percentAdult
+Pop_child <- PopT/3
+Pop_childless_adult <- PopT/3 * (1-percentAdultParent)
+Pop_parent <- PopT/3 * percentAdultParent
+Pop_senior <- PopT/3
+total_pop <- c(
+  "Adults (50+)" = Pop_senior,
+  "Adults with Children (Parents)" = Pop_parent,
+  "Childless Adults" = Pop_childless_adult,
+  "Children" = Pop_child
+)
 ```
 
 ## DataFrame Set Up Function Using ODE
@@ -57,10 +72,7 @@ run_ode <- function(init, seir, times, parms, vacc_type, disease) {
       grepl("^R_.*2$", name) ~ "Recovered (Second)",
       grepl("^D_.*1$", name) ~ "Dead (First)",
       grepl("^D_.*2$", name) ~ "Dead (Second)"
-  )) %>%
-    group_by(time, group) %>%
-    mutate(proportion = value / sum(value)) %>%
-    ungroup()
+  ))
   return(df)
 }
 ```
@@ -88,11 +100,11 @@ full_plot <- function(df, title) {
         panel.spacing = unit(0.5, "cm"))
 }
 
-infection_plot <- function(df, title, max_time) {
+infection_plot <- function(df, title, min_time, max_time) {
   if (is.null(max_time)) {
     max_time = max(times) + 1
   }
-  df %>% filter(time < max_time) %>%
+  df %>% filter(time < max_time) %>% filter(time > min_time) %>%
   ggplot(aes(x=time, y=infections, color=type)) +
   geom_line() + 
   scale_color_paletteer_d("MoMAColors::Andri") +
@@ -116,13 +128,14 @@ infection_plot <- function(df, title, max_time) {
         panel.spacing = unit(0.5, "cm"))
 }
 
-infection_plot_prop <- function(df, title, max_time) {
+infection_plot_prop <- function(df, title, min_time, max_time) {
   if (is.null(max_time)) {
     max_time = max(times) + 1
   }
-  df %>% filter(time < max_time) %>%
+  df %>% filter(time < max_time) %>% filter(time > min_time) %>%
   ggplot(aes(x=time, y=proportion, color=type)) +
   geom_line() + 
+  ylim(0, 1) + 
   scale_color_paletteer_d("MoMAColors::Andri") +
   facet_wrap(~group, ncol = 2) +
   ggtitle(title) + 
@@ -158,15 +171,15 @@ set_vacc <- function(disease, type) {
     vaccS <- function(t){0}
   } else if (type == "Current Vaccination") {
       if (disease == "COVID-19") {
-        vaccC <- vacc_weekly(0.642, WVH, k)
-        vaccCA <- vacc_weekly(0.697, WVH, k)
-        vaccP <- vacc_weekly(0.697, WVH, k)
-        vaccS <- vacc_weekly(0.863, WVH, k)
+        vaccC <- vacc_weekly(0.6423, WVH, k)
+        vaccCA <- vacc_weekly(0.6973, WVH, k)
+        vaccP <- vacc_weekly(0.6973, WVH, k)
+        vaccS <- vacc_weekly(0.8628, WVH, k)
       } else if (disease == "Flu") {
-        vaccC <- vacc_weekly(0.597, WVH, k)
-        vaccCA <- vacc_weekly(0.367, WVH, k)
-        vaccP <- vacc_weekly(0.491, WVH, k)
-        vaccS <- vacc_weekly(0.613, WVH, k)
+        vaccC <- vacc_weekly(0.5976, WVH, k)
+        vaccCA <- vacc_weekly(0.3669, WVH, k)
+        vaccP <- vacc_weekly(0.4909, WVH, k)
+        vaccS <- vacc_weekly(0.6129, WVH, k)
       } else if (disease == "RSV") {
         vaccC <- vacc_weekly(0.468, WVH, k)
         vaccCA <- vacc_weekly(0, WVH, k)
@@ -180,15 +193,15 @@ set_vacc <- function(disease, type) {
       }
   } else if (type == "Same Vaccination") {
     if (disease == "COVID-19") {
-        vaccC <- vacc_weekly(0.697, WVH, k)
-        vaccCA <- vacc_weekly(0.697, WVH, k)
-        vaccP <- vacc_weekly(0.697, WVH, k)
-        vaccS <- vacc_weekly(0.863, WVH, k)
+        vaccC <- vacc_weekly(0.6973, WVH, k)
+        vaccCA <- vacc_weekly(0.6973, WVH, k)
+        vaccP <- vacc_weekly(0.6973, WVH, k)
+        vaccS <- vacc_weekly(0.8628, WVH, k)
     } else if (disease == "Flu") {
-        vaccC <- vacc_weekly(0.597, WVH, k)
-        vaccCA <- vacc_weekly(0.597, WVH, k)
-        vaccP <- vacc_weekly(0.597, WVH, k)
-        vaccS <- vacc_weekly(0.613, WVH, k)
+        vaccC <- vacc_weekly(0.5976, WVH, k)
+        vaccCA <- vacc_weekly(0.5976, WVH, k)
+        vaccP <- vacc_weekly(0.5976, WVH, k)
+        vaccS <- vacc_weekly(0.6129, WVH, k)
     } else if (disease == "RSV") {
         vaccC <- vacc_weekly(0.468, WVH, k)
         vaccCA <- vacc_weekly(0.468, WVH, k)
@@ -245,21 +258,27 @@ COVIDout <- rbind(COVIDNoVac, COVIDCurrVac, COVIDSameVac)
 # filter so only infections
 COVIDoutGrouped <- COVIDout %>% filter(str_starts(name, "I_")) %>%
             group_by(time, type, group) %>%
-            summarise(infections = sum(value))
+            summarise(infections = sum(value)) %>%
+            mutate(proportion = infections / total_pop[group])
 
 COVIDoutGrouped$type <- factor(COVIDoutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
 ```
 
 ```{R}
-COVIDplotInfections60ct <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (60 days)", 60)
+COVIDplotInfections60ct <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (60 days)", 0, 60)
 ggsave("figures/COVIDplotInfections60ct.png", width = 10, height = 7, dpi = 300)
-COVIDplotInfections60prop <- infection_plot_prop(COVIDoutGrouped, "COVID-19 Infections Proportion (60 days)", 60)
+COVIDplotInfections60prop <- infection_plot_prop(COVIDoutGrouped, "COVID-19 Infections Proportion (60 days)", 0, 60)
 ggsave("figures/COVIDplotInfections60prop.png", width = 10, height = 7, dpi = 300)
 
-COVIDplotInfections <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (500 days)", NULL)
-ggsave("figures/COVIDplotInfectionsct.png", width = 10, height = 7, dpi = 300)
-COVIDplotInfectionsprop <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Proportion (500 days)", NULL)
-ggsave("figures/COVIDplotInfectionsprop.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections500ct <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (500 days)", 0, 500)
+ggsave("figures/COVIDplotInfections500ct.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfectionsprop <- infection_plot_prop(COVIDoutGrouped, "COVID-19 Infections Proportion (500 days)", 0, 500)
+ggsave("figures/COVIDplotInfections500prop.png", width = 10, height = 7, dpi = 300)
+
+COVIDplotInfections5yrct <- infection_plot(COVIDoutGrouped, "COVID-19 Infections Count (5 years)", 1826, NULL)
+ggsave("figures/COVIDplotInfections5yrct.png", width = 10, height = 7, dpi = 300)
+COVIDplotInfections5yrprop <- infection_plot_prop(COVIDoutGrouped, "COVID-19 Infections Proportion (5 years)", 1826, NULL)
+ggsave("figures/COVIDplotInfections5yrprop.png", width = 10, height = 7, dpi = 300)
 ```
 
 
@@ -270,15 +289,97 @@ FLUout <- rbind(FLUNoVac, FLUCurrVac, FLUSameVac)
 # filter so only infections
 FLUoutGrouped <- FLUout %>% filter(str_starts(name, "I_")) %>%
             group_by(time, type, group) %>%
-            summarise(infections = sum(value))
+            summarise(infections = sum(value)) %>%
+            mutate(proportion = infections / total_pop[group])
 
 FLUoutGrouped$type <- factor(FLUoutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
 ```
 
 ```{R}
-FLUplotInfections60 <- infection_plot(FLUoutGrouped, "Flu Infections (60 days)", 60)
-ggsave("figures/FLUplotInfections60.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections60ct <- infection_plot(FLUoutGrouped, "Flu Infections Count (60 days)", 0, 60)
+ggsave("figures/FLUplotInfections60ct.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections60prop <- infection_plot_prop(FLUoutGrouped, "Flu Infections Proportion (60 days)", 0, 60)
+ggsave("figures/FLUplotInfections60prop.png", width = 10, height = 7, dpi = 300)
 
-FLUplotInfections <- infection_plot(FLUoutGrouped, "Flu Infections (500 days)", NULL)
-ggsave("figures/FLUplotInfections.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections500ct <- infection_plot(FLUoutGrouped, "Flu Infections Count (500 days)", 0, 500)
+ggsave("figures/FLUplotInfections500ct.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections500prop <- infection_plot_prop(FLUoutGrouped, "Flu Infections Proportion (500 days)", 0, 500)
+ggsave("figures/FLUplotInfections500prop.png", width = 10, height = 7, dpi = 300)
+
+FLUplotInfections5yrct <- infection_plot(FLUoutGrouped, "Flu Infections Count (5 years)", 1826, NULL)
+ggsave("figures/FLUplotInfections5yrct.png", width = 10, height = 7, dpi = 300)
+FLUplotInfections5yrprop <- infection_plot_prop(FLUoutGrouped, "Flu Infections Proportion (5 years)", 1826, NULL)
+ggsave("figures/FLUplotInfections5yrprop.png", width = 10, height = 7, dpi = 300)
+```
+
+### RSV
+```{R}
+# ODE setup
+RSVNoVac <- run_ode(init, seir, times, rsv_parms, "No Vaccination", "RSV")
+RSVCurrVac <- run_ode(init, seir, times, rsv_parms, "Current Vaccination", "RSV")
+RSVSameVac <- run_ode(init, seir, times, rsv_parms, "Same Vaccination", "RSV")
+
+# Combine DF
+# make new dataframe with infections for each group
+RSVout <- rbind(RSVNoVac, RSVCurrVac, RSVSameVac) 
+# filter so only infections
+RSVoutGrouped <- RSVout %>% filter(str_starts(name, "I_")) %>%
+            group_by(time, type, group) %>%
+            summarise(infections = sum(value)) %>%
+            mutate(proportion = infections / total_pop[group])
+
+RSVoutGrouped$type <- factor(RSVoutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
+```
+
+```{R}
+RSVplotInfections60ct <- infection_plot(RSVoutGrouped, "RSV Infections Count (60 days)", 0, 60)
+ggsave("figures/RSVplotInfections60ct.png", width = 10, height = 7, dpi = 300)
+RSVplotInfections60prop <- infection_plot_prop(RSVoutGrouped, "RSV Infections Proportion (60 days)", 0, 60)
+ggsave("figures/RSVplotInfections60prop.png", width = 10, height = 7, dpi = 300)
+
+RSVplotInfections500ct <- infection_plot(RSVoutGrouped, "RSV Infections Count (500 days)", 0, 500)
+ggsave("figures/RSVplotInfections500ct.png", width = 10, height = 7, dpi = 300)
+RSVplotInfections500prop <- infection_plot_prop(RSVoutGrouped, "RSV Infections Proportion (500 days)", 0, 500)
+ggsave("figures/RSVplotInfections500prop.png", width = 10, height = 7, dpi = 300)
+
+RSVplotInfections5yrct <- infection_plot(RSVoutGrouped, "RSV Infections Count (5 years)", 1826, NULL)
+ggsave("figures/RSVplotInfections5yrct.png", width = 10, height = 7, dpi = 300)
+RSVplotInfections5yrprop <- infection_plot_prop(RSVoutGrouped, "RSV Infections Proportion (5 years)", 1826, NULL)
+ggsave("figures/RSVplotInfections5yrprop.png", width = 10, height = 7, dpi = 300)
+```
+
+### Pertussis 
+```{R}
+# ODE setup
+PERTNoVac <- run_ode(init, seir, times, pertussis_parms, "No Vaccination", "Pertussis")
+PERTCurrVac <- run_ode(init, seir, times, pertussis_parms, "Current Vaccination", "Pertussis")
+PERTSameVac <- run_ode(init, seir, times, pertussis_parms, "Same Vaccination", "Pertussis")
+
+# Combine DF
+# make new dataframe with infections for each group
+PERTout <- rbind(PERTNoVac, PERTCurrVac, PERTSameVac) 
+# filter so only infections
+PERToutGrouped <- PERTout %>% filter(str_starts(name, "I_")) %>%
+            group_by(time, type, group) %>%
+            summarise(infections = sum(value)) %>%
+            mutate(proportion = infections / total_pop[group])
+
+PERToutGrouped$type <- factor(PERToutGrouped$type, levels=c('No Vaccination', 'Current Vaccination', 'Same Vaccination'))
+```
+
+```{R}
+PERTplotInfections60ct <- infection_plot(PERToutGrouped, "Pertussis Infections Count (60 days)", 0, 60)
+ggsave("figures/PERTplotInfections60ct.png", width = 10, height = 7, dpi = 300)
+PERTplotInfections60prop <- infection_plot_prop(PERToutGrouped, "Pertussis Infections Proportion (60 days)", 0, 60)
+ggsave("figures/PERTplotInfections60prop.png", width = 10, height = 7, dpi = 300)
+
+PERTplotInfections500ct <- infection_plot(PERToutGrouped, "Pertussis Infections Count (500 days)", 0, 500)
+ggsave("figures/PERTplotInfections500ct.png", width = 10, height = 7, dpi = 300)
+PERTplotInfections500prop <- infection_plot_prop(PERToutGrouped, "Pertussis Infections Proportion (500 days)", 0, 500)
+ggsave("figures/PERTplotInfections500prop.png", width = 10, height = 7, dpi = 300)
+
+PERTplotInfections5yrct <- infection_plot(PERToutGrouped, "Pertussis Infections Count (5 years)", 1826, NULL)
+ggsave("figures/PERTplotInfections5yrct.png", width = 10, height = 7, dpi = 300)
+PERTplotInfections5yrprop <- infection_plot_prop(PERToutGrouped, "Pertussis Infections Proportion (5 years)", 1826, NULL)
+ggsave("figures/PERTplotInfections5yrprop.png", width = 10, height = 7, dpi = 300)
 ```

@@ -56,9 +56,9 @@ flu_parms <- c(epsilon = 1, omega = 1/(15*30),  b = 1,  mu = 10*((0.257 + 0.305)
                ss = 0.5, si = 0.5)
 
 pertussis_parms <- c(epsilon = 1/7, omega = 1/(55*365),  b = 1,  mu = 10*(0.11/5), gamma = 1/(3*7),     
-                     alphaC1 = 0.0015, alphaC2 = .1*0.0015,
-                     alphaA1 = 0.005, alphaA2 = .1*0.005, 
-                     alphaS1 = 0.025, alphaS2 = .1*0.025,
+                     alphaC1 = 0.005, alphaC2 = 0,
+                     alphaA1 = 0, alphaA2 = 0, 
+                     alphaS1 = 0, alphaS2 = 0,
                      cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
                      ss = 0.5, si = 0.5)
 

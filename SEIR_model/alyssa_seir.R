@@ -9,6 +9,7 @@ seir <- function(t, y, pars){
   omega <- pars$omega[1] # waning of immunity 
   b <- pars$b[1] # immunity scalar
   mu <- pars$mu[1]  # probability of transition given contact
+  mu2 <- (1+delta_modify(t))*mu
   gamma <- pars$gamma[1] # recovery rate for asymptomatic
   alphaC1 <- pars$alphaC1[1] # infection-induced death rate for children
   alphaC2 <- pars$alphaC2[1] 
@@ -100,10 +101,10 @@ seir <- function(t, y, pars){
   
   # force of infection: 
   # Lambda = Child to Adult contact * mu * prop of adults infected
-  lambdaC <- mu*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
-  lambdaCA <- mu*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
-  lambdaP <- mu*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
-  lambdaS <- mu*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
+  lambdaC <- mu2*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
+  lambdaCA <- mu2*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
+  lambdaP <- mu2*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
+  lambdaS <- mu2*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
   
   #Aging Rates
   deltaCA <- 1/(18*365) # aging rate from child to adult
@@ -173,11 +174,9 @@ seir <- function(t, y, pars){
   
 }
 
-#### Type III functional response ####
-
-type_III_resp <- function (t, Vmax, WVH, k) {
-  
-  return(Vmax*(t^k)/((WVH^k) + (t^k)))
+### Seasonality ###
+delta_modify <- function(t){
+  0.15*sin(2*pi*(t-365/2)/365)
 }
 
 #### Vaccination ####

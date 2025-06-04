@@ -9,7 +9,6 @@ seir <- function(t, y, pars){
   omega <- pars$omega[1] # waning of immunity 
   b <- pars$b[1] # immunity scalar
   mu <- pars$mu[1]  # probability of transition given contact
-  mu2 <- (1+delta_modify(t))*mu
   gamma <- pars$gamma[1] # recovery rate for asymptomatic
   alphaC1 <- pars$alphaC1[1] # infection-induced death rate for children
   alphaC2 <- pars$alphaC2[1] 
@@ -30,6 +29,10 @@ seir <- function(t, y, pars){
   vaccCA <- pars$vaccCA
   vaccP <- pars$vaccP
   vaccS <- pars$vaccS
+  delta_modify <- pars$seasonality_fn
+  
+  # seasonality affected mu
+  mu2 <- (1+delta_modify(t))*mu
   
   # Set up Population Parameters
   # Source: Illinois 2020 Census Data

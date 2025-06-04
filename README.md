@@ -1,7 +1,13 @@
-# SHIELD Project (URES Spring 2025)
+# SHIELD Project (URES Spring 2025/Summer 2025)
 
 This repository includes:
 
-- Survey Exploration
+- Wave 1 Survey Exploration
     - Demography Analysis & Confidence Intervals
-- COVID-19 SEIR Model
+    - Demography Figures (Income)
+- SEIR Models with Vaccination
+    - COVID-19
+    - Influenza
+    - RSV
+    - Pertussis
+- Presentations/Papers 

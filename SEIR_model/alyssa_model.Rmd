@@ -171,47 +171,47 @@ set_vacc <- function(disease, type) {
     vaccS <- function(t){0}
   } else if (type == "Current Vaccination") {
       if (disease == "COVID-19") {
-        vaccC <- vacc_weekly(0.6423, WVH, k)
-        vaccCA <- vacc_weekly(0.6973, WVH, k)
-        vaccP <- vacc_weekly(0.6973, WVH, k)
-        vaccS <- vacc_weekly(0.8628, WVH, k)
+        vaccC <- vacc_weekly(0.38561776061776104, WVH, k)
+        vaccCA <- vacc_weekly(0.5117845117845116, WVH, k)
+        vaccP <- vacc_weekly(0.5441389290882782, WVH, k)
+        vaccS <- vacc_weekly(0.7282965743782258, WVH, k)
       } else if (disease == "Flu") {
-        vaccC <- vacc_weekly(0.5976, WVH, k)
-        vaccCA <- vacc_weekly(0.3669, WVH, k)
-        vaccP <- vacc_weekly(0.4909, WVH, k)
-        vaccS <- vacc_weekly(0.6129, WVH, k)
+        vaccC <- vacc_weekly(0.5974963890226275, WVH, k)
+        vaccCA <- vacc_weekly(0.3661491859144262, WVH, k)
+        vaccP <- vacc_weekly(0.4923757993113624, WVH, k)
+        vaccS <- vacc_weekly(0.6057398259233123, WVH, k)
       } else if (disease == "RSV") {
-        vaccC <- vacc_weekly(0.468, WVH, k)
+        vaccC <- vacc_weekly(0.5346153846153847, WVH, k)
         vaccCA <- vacc_weekly(0, WVH, k)
         vaccP <- vacc_weekly(0, WVH, k)
         vaccS <- vacc_weekly(0, WVH, k)
       } else if (disease == "Pertussis") {
-        vaccC <- vacc_weekly(0.86, WVH, k)
+        vaccC <- vacc_weekly(0.8594594594594596, WVH, k)
         vaccCA <- vacc_weekly(0, WVH, k)
         vaccP <- vacc_weekly(0, WVH, k)
         vaccS <- vacc_weekly(0, WVH, k)
       }
   } else if (type == "Same Vaccination") {
     if (disease == "COVID-19") {
-        vaccC <- vacc_weekly(0.6973, WVH, k)
-        vaccCA <- vacc_weekly(0.6973, WVH, k)
-        vaccP <- vacc_weekly(0.6973, WVH, k)
-        vaccS <- vacc_weekly(0.8628, WVH, k)
+        vaccC <- vacc_weekly(0.5441389290882782, WVH, k)
+        vaccCA <- vacc_weekly(0.5441389290882782, WVH, k)
+        vaccP <- vacc_weekly(0.5441389290882782, WVH, k)
+        vaccS <- vacc_weekly(0.7282965743782258, WVH, k)
     } else if (disease == "Flu") {
-        vaccC <- vacc_weekly(0.5976, WVH, k)
-        vaccCA <- vacc_weekly(0.5976, WVH, k)
-        vaccP <- vacc_weekly(0.5976, WVH, k)
-        vaccS <- vacc_weekly(0.6129, WVH, k)
+        vaccC <- vacc_weekly(0.5974963890226275, WVH, k)
+        vaccCA <- vacc_weekly(0.5974963890226275, WVH, k)
+        vaccP <- vacc_weekly(0.5974963890226275, WVH, k)
+        vaccS <- vacc_weekly(0.6057398259233123, WVH, k)
     } else if (disease == "RSV") {
-        vaccC <- vacc_weekly(0.468, WVH, k)
-        vaccCA <- vacc_weekly(0.468, WVH, k)
-        vaccP <- vacc_weekly(0.468, WVH, k)
-        vaccS <- vacc_weekly(0.468, WVH, k)
+        vaccC <- vacc_weekly(0.5346153846153847, WVH, k)
+        vaccCA <- vacc_weekly(0.5346153846153847, WVH, k)
+        vaccP <- vacc_weekly(0.5346153846153847, WVH, k)
+        vaccS <- vacc_weekly(0.5346153846153847, WVH, k)
     } else if (disease == "Pertussis") {
-        vaccC <- vacc_weekly(0.86, WVH, k)
-        vaccCA <- vacc_weekly(0.86, WVH, k)
-        vaccP <- vacc_weekly(0.86, WVH, k)
-        vaccS <- vacc_weekly(0.86, WVH, k)
+        vaccC <- vacc_weekly(0.8594594594594596, WVH, k)
+        vaccCA <- vacc_weekly(0.8594594594594596, WVH, k)
+        vaccP <- vacc_weekly(0.8594594594594596, WVH, k)
+        vaccS <- vacc_weekly(0.8594594594594596, WVH, k)
     }
   }
   return(c(vaccC = vaccC, vaccCA = vaccCA, vaccP = vaccP, vaccS = vaccS))

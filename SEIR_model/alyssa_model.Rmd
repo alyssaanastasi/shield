@@ -22,6 +22,7 @@ library(spatstat.utils)
 library(paletteer)
 source("alyssa_seir.R")
 source("alyssa_SEIR_params.R")
+source("alyssa_pertussis_seir.R")
 ```
 
 

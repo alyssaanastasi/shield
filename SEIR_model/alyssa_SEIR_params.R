@@ -12,14 +12,15 @@ Pop_child <- PopT/3
 Pop_childless_adult <- PopT/3 * (1-percentAdultParent)
 Pop_parent <- PopT/3 * percentAdultParent
 Pop_senior <- PopT/3
-names_var <- c("S_C1", "E_C1", "I_C1", "R_C1", "D_C1",
-              "S_C2", "E_C2", "I_C2", "R_C2", "D_C2",
-              "S_CA1", "E_CA1", "I_CA1", "R_CA1", "D_CA1",
-              "S_CA2", "E_CA2", "I_CA2", "R_CA2", "D_CA2",
-              "S_P1", "E_P1", "I_P1", "R_P1", "D_P1",
-              "S_P2", "E_P2", "I_P2", "R_P2", "D_P2",
-              "S_S1", "E_S1", "I_S1", "R_S1", "D_S1",
-              "S_S2", "E_S2", "I_S2", "R_S2", "D_S2")
+names_var <- c("S_C1", "E_C1", "I_C1", "H_C1", "R_C1", "D_C1",
+              "S_C2", "E_C2", "I_C2", "H_C2", "R_C2", "D_C2",
+              "S_CA1", "E_CA1", "I_CA1", "H_CA1", "R_CA1", "D_CA1",
+              "S_CA2", "E_CA2", "I_CA2", "H_CA2", "R_CA2", "D_CA2",
+              "S_P1", "E_P1", "I_P1", "H_P1", "R_P1", "D_P1",
+              "S_P2", "E_P2", "I_P2", "H_P2", "R_P2", "D_P2",
+              "S_S1", "E_S1", "I_S1", "H_S1", "R_S1", "D_S1",
+              "S_S2", "E_S2", "I_S2", "H_S2", "R_S2", "D_S2")
+
 
 init <- rep(0,length(names_var))
 names(init) <- names_var

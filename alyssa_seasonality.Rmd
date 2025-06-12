@@ -106,3 +106,68 @@ loglik <- function(
 ```{R}
 covid_mortality <- read.csv("data/COVID_mortality.csv")
 ```
+
+```{R}
+#### Set bounds ####
+start = list(
+  mu_janfeb = 1, 
+  mu_marapr = 1, 
+  mu_mayjun = 1, 
+  mu_julaug = 1, 
+  mu_septoct = 1, 
+  mu_novdec = 1, 
+  alpha = 1/10,
+  risk_old_h = 7.3, 
+  risk_child_h = 0.2,
+  sig_dist = 0.2)
+
+upper_limit = list(
+  mu_janfeb = 5, 
+  mu_marapr = 5, 
+  mu_mayjun = 5, 
+  mu_julaug = 5, 
+  mu_septoct = 5, 
+  mu_novdec = 5,
+  alpha = 1/2,
+  risk_old_h = 20,
+  risk_child_h = 1,
+  sig_dist = 2
+)
+
+lower_limit = list(
+  mu_janfeb = 0, 
+  mu_marapr = 0, 
+  mu_mayjun = 0, 
+  mu_julaug = 0, 
+  mu_septoct = 0, 
+  mu_novdec = 0, 
+  alpha = 1/50,
+  risk_old_h = 2,
+  risk_child_h = 0.05,
+  sig_dist = 0.05
+)
+
+```
+
+```{R}
+m1_A = mle2(minuslogl = loglik,
+              start = start,
+              data = data,
+              method = "L-BFGS-B",
+              #fixed = list(mu = 0.03),
+              upper= upper_limit,
+              lower = lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(start))))
+```
+
+
+```{R}
+full <- summary(m1_A)
+  
+  dt <- data.table::as.data.table(coef(full), .keep.rownames = "word")
+  
+  write_to <- paste("../data/calibrate/", Geography_i, ".csv", sep = "")
+  
+  write_csv(dt, write_to)
+
+```

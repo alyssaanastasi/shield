@@ -8,17 +8,20 @@ seir <- function(t, y, pars){
   # S -> E -> I -> R -> S2
   #        -> H (Hospitalized/Severe) -> R OR D
   # Parameters
-  epsilon <- pars$epsilon[1]  # how long it takes to move from e to i
-  omega <- pars$omega[1] # waning of immunity 
-  b <- pars$b[1] # immunity scalar
   mu <- pars$mu[1]  # probability of transition given contact
-  gamma <- pars$gamma[1] # recovery rate for asymptomatic
-  alphaC1 <- pars$alphaC1[1] # infection-induced death rate for children
-  alphaC2 <- pars$alphaC2[1] 
-  alphaA1 <- pars$alphaA1[1] #infection induced death rate for adults (both parents and CA)
-  alphaA2 <- pars$alphaA2[1]
-  alphaS1 <- pars$alphaS1[1]
-  alphaS2 <- pars$alphaS2[1]
+  epsilon <- pars$epsilon[1]  # how long it takes to move from e to i
+  probCH1 <- pars$probCH1[1] #probability of severe infection/hospitalization with no prior immunity
+  probCH2 <- pars$probCH2[1] #probability of severe infection/hospitalization with prior immunity
+  probAH1 <- pars$probAH1[1] 
+  probAH2 <- pars$probAH2[1] 
+  probSH1 <- pars$probSH1[1] 
+  probSH2 <- pars$probSH2[1] 
+  gamma <- pars$gamma[1] # recovery rate
+  omega <- pars$omega[1] # waning of immunity 
+  b <- pars$b[1] # immunity scalar (people with previous infection/vaccination have longer waning of immunity)
+  alphaC <- pars$alphaC[1] # infection-induced death rate for children
+  alphaA <- pars$alphaA[1] #infection induced death rate for adults (both parents and CA)
+  alphaS <- pars$alphaS[1]
   cCC <- pars$cCC[1] # contact between children 
   cCCA <- pars$cCCA[1] # contact between children and childless adults
   cCP <- pars$cCP[1] # contact between children and adults with children
@@ -28,15 +31,10 @@ seir <- function(t, y, pars){
   cSS <- pars$cSS[1] # contact between seniors
   ss <- pars$ss[1] # scale susceptibility -> people who have already had covid are less susceptible
   si <- pars$si[1] # scale infectiousness -> people with immunity are less infectious
-  probH <- pars$probH[1] #probability of severe infection/hospitalization
   vaccC <- pars$vaccC #child vaccination
   vaccCA <- pars$vaccCA #childless adult vaccination
   vaccP <- pars$vaccP #parent vaccination
   vaccS <- pars$vaccS #senior vaccination
-  delta_modify <- pars$seasonality_fn
-  
-  # seasonality affected mu (** needs to be changed to mu(t) i think **)
-  mu2 <- (1+delta_modify(t))*mu
   
   # Set up Population Parameters
   # Source: Illinois 2020 Census Data
@@ -107,7 +105,7 @@ seir <- function(t, y, pars){
   D_S2 <- y[48]
   
   # Group totals
-  sumIC <- I_C1 + si*I_C2 + H_C1 + si*H_C2 # How does this change with the hospitalized/severe compartment? 
+  sumIC <- I_C1 + si*I_C2 + H_C1 + si*H_C2 #As of right now, this assumes hospitalized people are just as infectious as normal infected people ?? 
   popC <- S_C1 + E_C1 + I_C1 + H_C1 + R_C1 + S_C2 + E_C2 + I_C2 + H_C2 + R_C2
   sumICA <- I_CA1 + si*I_CA2 + H_CA1 + si*H_CA2
   popCA <- S_CA1 + E_CA1+ I_CA1 + H_CA1 + R_CA1 + S_CA2 + E_CA2 + I_CA2 + H_CA2 + R_CA2
@@ -120,10 +118,10 @@ seir <- function(t, y, pars){
   
   # force of infection: 
   # Lambda = Child to Adult contact * mu * prop of adults infected
-  lambdaC <- mu2*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
-  lambdaCA <- mu2*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
-  lambdaP <- mu2*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
-  lambdaS <- mu2*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
+  lambdaC <- mu*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
+  lambdaCA <- mu*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
+  lambdaP <- mu*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
+  lambdaS <- mu*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
   
   #Aging Rates
   deltaCA <- 1/(18*365) # aging rate from child to adult
@@ -134,15 +132,15 @@ seir <- function(t, y, pars){
   #child updates
   dS_C1 <- -(lambdaC + vaccC(t))*S_C1 - deltaCA*S_C1 + deltaSC*popS
   dE_C1 <- lambdaC*S_C1 - (epsilon + vaccC(t))*E_C1 - deltaCA*E_C1 
-  dI_C1 <- epsilon*E_C1 - gamma*I_C1 - (deltaCA)*I_C1 # NEED TO ADD PARM FOR SEVERE/MILD
-  dH_C1 <- epsilon*E_C1 - gamma*H_C1 - (deltaCA)*H_C1 
+  dI_C1 <- (1-probCH1)*epsilon*E_C1 - gamma*I_C1 - (deltaCA)*I_C1 
+  dH_C1 <- probCH1*epsilon*E_C1 - gamma*H_C1 - (deltaCA)*H_C1 
   dR_C1 <- gamma*I_C1 + (1-alphaC1)*gamma*H_C1 - (omega + vaccC(t))*R_C1 - (deltaCA)*R_C1 
   dD_C1 <- alphaC1*gamma*H_C1
   
   dS_C2 <- omega*R_C1 + b*omega*R_C2 - (ss*lambdaC + vaccC(t))*S_C2 - (deltaCA)*S_C2 
   dE_C2 <- ss*lambdaC*S_C2 - (epsilon + vaccC(t))*E_C2 - (deltaCA)*E_C2
-  dI_C2 <- epsilon*E_C2 - gamma*I_C2 - (deltaCA)*I_C2
-  dH_C2 <- epsilon*E_C2 - gamma*H_C2 - (deltaCA)*H_C2
+  dI_C2 <- (1-probCH2)*epsilon*E_C2 - gamma*I_C2 - (deltaCA)*I_C2
+  dH_C2 <- probCH2*epsilon*E_C2 - gamma*H_C2 - (deltaCA)*H_C2
   dR_C2 <- vaccC(t)*(S_C1 + E_C1 + R_C1 + S_C2 + E_C2) + gamma*I_C2 - b*omega*R_C2 - (deltaCA)*R_C2
   dD_C2 <- alphaC2*gamma*H_C2
   
@@ -201,8 +199,9 @@ seir <- function(t, y, pars){
 #### Seasonal function ####
 seas_matrix <- function(mu_janapr, mu_mayaug, mu_sepdec){
   n <- 365
-  x <- 0:(n-1)/(n-1);
-  k<- 0:6/6
+  x <- 0:(n-1)/(n-1); #normalizing sequence
+  k<- 0:6/6 # number of parameters wanted & normalized 
+  # below is a cubic spline 
   matrix <- cSplineDes(x, k, ord = 4, derivs=0) %>%
     as.data.frame() %>%
     mutate(day = 1:365) %>%

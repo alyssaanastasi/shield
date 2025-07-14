@@ -20,9 +20,12 @@ library(RColorBrewer)
 library(ggrepel)
 library(spatstat.utils)
 library(paletteer)
+library(bbmle)
+library(mgcv)
 source("alyssa_seir.R")
 source("alyssa_SEIR_params.R")
 source("alyssa_pertussis_seir.R")
+source("alyssa_seasonality.R")
 ```
 
 
@@ -44,23 +47,29 @@ total_pop <- c(
   "Childless Adults" = Pop_childless_adult,
   "Children" = Pop_child
 )
+
+get_parms <- function(parms, vacc_type, disease) {
+  vaccs <- set_vacc(disease, vacc_type)
+  full_parms <- c(parms, vaccs)
+  return(full_parms)
+}
 ```
 
 ## DataFrame Set Up Function Using ODE
 ```{r}
 run_ode <- function(init, seir, times, parms, vacc_type, disease) {
   vaccs <- set_vacc(disease, vacc_type)
-  seasonality_fn <- set_seasonality(disease)
-  full_parms <- c(parms, vaccs, seasonality_fn)
+  # seasonality_fn <- set_seasonality(disease)
+  full_parms <- c(parms, vaccs)
   df <- ode(y=init, func = seir, times=times, parms = full_parms) %>% 
   as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
   mutate(name = fct_relevel(name, names(init)),
          type = vacc_type) %>%
   mutate(group = case_when(
-      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
-      grepl("^S_CA|^E_CA|^I_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
-      grepl("^S_P|^E_P|^I_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
-      grepl("^S_S|^E_S|^I_S|^R_S|^D_S", name) ~ "Adults (50+)",
+      grepl("^S_C1|^S_C2|^E_C1|^E_C2|^I_C1|^I_C2|^H_C1|^H_C2|^E_C2|^R_C1|^R_C2|^D_C1|^D_C2", name) ~ "Children",
+      grepl("^S_CA|^E_CA|^I_CA|^H_CA|^R_CA|^D_CA", name) ~ "Childless Adults",
+      grepl("^S_P|^E_P|^I_P|^H_P|^R_P|^D_P", name) ~ "Adults with Children (Parents)",
+      grepl("^S_S|^E_S|^I_S|^H_S|^R_S|^D_S", name) ~ "Adults (50+)",
   )) %>%
     mutate(label = case_when(
       grepl("^S_.*1$", name) ~ "Susceptible (First)",
@@ -69,6 +78,8 @@ run_ode <- function(init, seir, times, parms, vacc_type, disease) {
       grepl("^E_.*2$", name) ~ "Exposed (Second)",
       grepl("^I_.*1$", name) ~ "Infected (First)",
       grepl("^I_.*2$", name) ~ "Infected (Second)",
+      grepl("^H_.*1$", name) ~ "Hospitalized (First)",
+      grepl("^H_.*2$", name) ~ "Hospitalized (Second)",
       grepl("^R_.*1$", name) ~ "Recovered (First)",
       grepl("^R_.*2$", name) ~ "Recovered (Second)",
       grepl("^D_.*1$", name) ~ "Dead (First)",
@@ -160,7 +171,7 @@ infection_plot_prop <- function(df, title, min_time, max_time) {
 
 ```
 
-## Vaccination Functions
+## Vaccination Function
 ```{R}
 set_vacc <- function(disease, type) {
   WVH <- 15
@@ -217,22 +228,55 @@ set_vacc <- function(disease, type) {
   }
   return(c(vaccC = vaccC, vaccCA = vaccCA, vaccP = vaccP, vaccS = vaccS))
 }
-
-set_seasonality <- function(disease){
-  if (disease == "COVID-19"){
-    delta_modify <- function(t){0.5*sin(2*pi*(t-365/2)/365)}
-  } else if (disease == "Flu") {
-    delta_modify <- function(t){0.15*sin(2*pi*(t-365/2)/365)}
-  } else if (disease == "RSV") {
-    delta_modify <- function(t){0.15*sin(2*pi*(t-365/2)/365)}
-  } else if (disease == "Pertussis") {
-    delta_modify <- function(t){0.15*sin(2*pi*(t-365/2)/365)}
-  }
-  return(delta_modify)
-}
 ```
 
 ### COVID
+
+## Callibrate Seasonality
+```{R}
+covid_mortality <- read.csv("~/Desktop/shield/data/COVID_mortality.csv") %>%
+                  mutate(date = mdy(date))
+covid_parms_full = get_parms(covid_parms, "No Vaccination", "COVID-19")
+
+start = list(
+  mu_janmar = 0.01, 
+  mu_aprjun = 0.01, 
+  mu_julsep = 0.01, 
+  mu_octdec = 0.01, 
+  sig_dist = 0.2)
+
+upper_limit = list(
+  mu_janmar = 1.5, 
+  mu_aprjun = 1.5, 
+  mu_julsep = 1.5, 
+  mu_octdec = 1.5, 
+  sig_dist = 2
+)
+
+lower_limit = list(
+  mu_janmar = 0, 
+  mu_aprjun = 0, 
+  mu_julsep = 0, 
+  mu_octdec = 0, 
+  sig_dist = 0.05
+)
+
+m1_A = mle2(minuslogl = loglik,
+              start = start,
+              data = covid_mortality,
+              method = "L-BFGS-B",
+              #fixed = list(mu = 0.03),
+              upper= upper_limit,
+              lower = lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(start))))
+```
+
+```{R}
+full <- summary(m1_A)
+dt <- data.table::as.data.table(coef(full), .keep.rownames = "word")
+```
+## Run Model
+
 ```{r}
 COVIDNoVac <- run_ode(init, seir, times, covid_parms, "No Vaccination", "COVID-19")
 COVIDCurrVac <- run_ode(init, seir, times, covid_parms, "Current Vaccination", "COVID-19")

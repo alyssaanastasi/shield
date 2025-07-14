@@ -31,19 +31,22 @@ init["E_CA1"] <- 1
 init["S_P1"] <- Pop_parent - 1
 init["E_P1"] <- 1
 init["S_S1"] <- Pop_senior - 1
-init["E_S2"] <- 1
+init["E_S1"] <- 1
+
 
 #sophie's model parms
 # covid_parms_wt <- c(beta = 10*(0.189)/5, epsilon = 1, phi = 1/3, gamma = 1/5, sigma = 0.017, omega = 1/(6*30) )
-                    
+
 # source for covid death rates: https://wwwnc.cdc.gov/eid/article/30/6/23-1285-t2    
 # source for age contact rates: 
-covid_parms <- c(epsilon = 1/3, omega = 1/(6*30),  b = 1,  mu = 10*(0.189/5), gamma = 1/5,     
-          alphaC1 = 0.0015, alphaC2 = .1*0.0015,
-          alphaA1 = 0.005, alphaA2 = .1*0.005, 
-          alphaS1 = 0.025, alphaS2 = .1*0.025,
-          cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
-          ss = 0.5, si = 0.5)
+# mu = 10*(0.189/5)
+covid_parms <- c(epsilon = 1/3, omega = 1/(6*30),  b = 1, gamma = 1/5,     
+                 alphaC = 0.0015, alphaA = 0.0015, alphaS = 0.025,
+                 probHC1 = 0.05, probHC2 = 0.05, 
+                 probHA1 = 0.05, probHA2 = 0.05,
+                 probHS1 = 0.05, probHS2 = 0.05,
+                 cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
+                 ss = 0.5, si = 0.5)
 
 # sophie's model parms
 # flu_parms <- c(beta = 10*((0.257 + 0.305)/2)/7, epsilon = 1, phi = 1, gamma = 1/7, sigma = 0.000159, omega = 1/(15*30))

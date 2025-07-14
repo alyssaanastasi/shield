@@ -27,6 +27,7 @@ For each age group, we have parameters:
 -   $S$: Susceptible ($S_C, S_{CA}, S_P, S_S$)
 -   $E$: Exposed ($E_C, E_{CA}, E_P, E_S$)
 -   $I$: Infected ($I_C, I_{CA}, I_P, I_S$)
+-   $H$: Hospitalized ($H_C, H_{CA}, H_P, H_S$)
 -   $R$: Recovered ($R_C, R_{CA}, R_P, R_S$)
 -   $D$: Dead ($D_C, D_{CA}, D_P, D_S$)
 

@@ -8,20 +8,21 @@ seir <- function(t, y, pars){
   # S -> E -> I -> R -> S2
   #        -> H (Hospitalized/Severe) -> R OR D
   # Parameters
-  mu <- pars$mu[1]  # probability of transition given contact
+  # mu <- pars$mu[1]  # probability of transition given contact
+
   epsilon <- pars$epsilon[1]  # how long it takes to move from e to i
-  probCH1 <- pars$probCH1[1] #probability of severe infection/hospitalization with no prior immunity
-  probCH2 <- pars$probCH2[1] #probability of severe infection/hospitalization with prior immunity
-  probAH1 <- pars$probAH1[1] 
-  probAH2 <- pars$probAH2[1] 
-  probSH1 <- pars$probSH1[1] 
-  probSH2 <- pars$probSH2[1] 
+  probHC1 <- pars$probHC1[1] #probability of severe infection/hospitalization with no prior immunity
+  probHC2 <- pars$probHC2[1] #probability of severe infection/hospitalization with prior immunity
+  probHA1 <- pars$probHA1[1] 
+  probHA2 <- pars$probHA2[1] 
+  probHS1 <- pars$probHS1[1] 
+  probHS2 <- pars$probHS2[1] 
   gamma <- pars$gamma[1] # recovery rate
   omega <- pars$omega[1] # waning of immunity 
   b <- pars$b[1] # immunity scalar (people with previous infection/vaccination have longer waning of immunity)
   alphaC <- pars$alphaC[1] # infection-induced death rate for children
   alphaA <- pars$alphaA[1] #infection induced death rate for adults (both parents and CA)
-  alphaS <- pars$alphaS[1]
+  alphaS <- pars$alphaS[1] # infection-induced death rate for seniors
   cCC <- pars$cCC[1] # contact between children 
   cCCA <- pars$cCCA[1] # contact between children and childless adults
   cCP <- pars$cCP[1] # contact between children and adults with children
@@ -118,10 +119,11 @@ seir <- function(t, y, pars){
   
   # force of infection: 
   # Lambda = Child to Adult contact * mu * prop of adults infected
-  lambdaC <- mu*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
-  lambdaCA <- mu*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
-  lambdaP <- mu*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
-  lambdaS <- mu*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
+  lambdaC <- mu(t)*(cCC*sumIC/popC + cCCA*sumICA/popCA + cCP*sumIP/popP + cCS*sumIS/popS)
+  lambdaC_terms <- c(mu(t), cCC*sumIC/popC, cCCA*sumICA/popCA, cCP*sumIP/popP, cCS*sumIS/popS)
+  lambdaCA <- mu(t)*(cAA*sumI_Adults/popAdults + cCCA*sumIC/popC + cSA*sumIS/popS)
+  lambdaP <- mu(t)*(cAA*sumI_Adults/popAdults + cCP*sumIC/popC + cSA*sumIS/popS)
+  lambdaS <- mu(t)*(cSS*sumIS/popS + cCS*sumIC/popC + cSA*sumI_Adults/popAdults)
   
   #Aging Rates
   deltaCA <- 1/(18*365) # aging rate from child to adult
@@ -129,192 +131,77 @@ seir <- function(t, y, pars){
   deltaSC <- 1/(30*365) # aging rate from senior to child (birth rate?)
     
   ## Updates
-  #child updates
+  # child updates
   dS_C1 <- -(lambdaC + vaccC(t))*S_C1 - deltaCA*S_C1 + deltaSC*popS
   dE_C1 <- lambdaC*S_C1 - (epsilon + vaccC(t))*E_C1 - deltaCA*E_C1 
-  dI_C1 <- (1-probCH1)*epsilon*E_C1 - gamma*I_C1 - (deltaCA)*I_C1 
-  dH_C1 <- probCH1*epsilon*E_C1 - gamma*H_C1 - (deltaCA)*H_C1 
-  dR_C1 <- gamma*I_C1 + (1-alphaC1)*gamma*H_C1 - (omega + vaccC(t))*R_C1 - (deltaCA)*R_C1 
-  dD_C1 <- alphaC1*gamma*H_C1
+  dI_C1 <- (1-probHC1)*epsilon*E_C1 - gamma*I_C1 - deltaCA*I_C1 
+  dH_C1 <- probHC1*epsilon*E_C1 - gamma*H_C1 - deltaCA*H_C1 
+  dR_C1 <- gamma*I_C1 + (1-alphaC)*gamma*H_C1 - (omega + vaccC(t))*R_C1 - deltaCA*R_C1 
+  dD_C1 <- alphaC*gamma*H_C1
   
-  dS_C2 <- omega*R_C1 + b*omega*R_C2 - (ss*lambdaC + vaccC(t))*S_C2 - (deltaCA)*S_C2 
-  dE_C2 <- ss*lambdaC*S_C2 - (epsilon + vaccC(t))*E_C2 - (deltaCA)*E_C2
-  dI_C2 <- (1-probCH2)*epsilon*E_C2 - gamma*I_C2 - (deltaCA)*I_C2
-  dH_C2 <- probCH2*epsilon*E_C2 - gamma*H_C2 - (deltaCA)*H_C2
-  dR_C2 <- vaccC(t)*(S_C1 + E_C1 + R_C1 + S_C2 + E_C2) + gamma*I_C2 - b*omega*R_C2 - (deltaCA)*R_C2
-  dD_C2 <- alphaC2*gamma*H_C2
+  dS_C2 <- omega*R_C1 + b*omega*R_C2 - (ss*lambdaC + vaccC(t))*S_C2 - deltaCA*S_C2 
+  dE_C2 <- ss*lambdaC*S_C2 - (epsilon + vaccC(t))*E_C2 - deltaCA*E_C2
+  dI_C2 <- (1-probHC2)*epsilon*E_C2 - gamma*I_C2 - deltaCA*I_C2
+  dH_C2 <- probHC2*epsilon*E_C2 - gamma*H_C2 - deltaCA*H_C2
+  dR_C2 <- vaccC(t)*(S_C1 + E_C1 + R_C1 + S_C2 + E_C2) + gamma*I_C2 + (1-alphaC)*gamma*H_C2 - b*omega*R_C2 - deltaCA*R_C2
+  dD_C2 <- alphaC*gamma*H_C2
   
+  # childless adults
+  dS_CA1 <- -(lambdaCA + vaccCA(t))*S_CA1 + deltaCA*(1 - percentAdultParent)*S_C1 - deltaAS*S_CA1
+  dE_CA1 <- lambdaCA*S_CA1 - (epsilon + vaccCA(t))*E_CA1 + deltaCA*(1 - percentAdultParent)*E_C1 - deltaAS*E_CA1
+  dI_CA1 <- (1-probHA1)*epsilon*E_CA1 - gamma*I_CA1 + deltaCA*(1 - percentAdultParent)*I_C1 - deltaAS*I_CA1
+  dH_CA1 <- probHA1*epsilon*E_CA1 - gamma*H_CA1 + deltaCA*(1 - percentAdultParent)*H_C1 - deltaAS*H_CA1
+  dR_CA1 <- gamma*I_CA1 + (1 - alphaA)*gamma*H_CA1 - (omega + vaccCA(t))*R_CA1 + deltaCA*(1 - percentAdultParent)*R_C1 - deltaAS*R_CA1
+  dD_CA1 <- alphaA*gamma*H_CA1
   
-  # childless adults updates
-  dS_CA1 <- -(lambdaCA + vaccCA(t)) * S_CA1 + (deltaCA * (1-percentAdultParent))*S_C1 - (deltaAS)*S_CA1
-  dE_CA1 <- lambdaCA* S_CA1 - (epsilon + vaccCA(t)) * E_CA1 + (deltaCA * (1-percentAdultParent))*E_C1 - (deltaAS)*E_CA1
-  dI_CA1 <- epsilon * E_CA1 - gamma * I_CA1 + (deltaCA * (1-percentAdultParent))*I_C1 - (deltaAS)*I_CA1
-  dR_CA1 <- gamma * I_CA1 - (omega + vaccCA(t)) * R_CA1 + (deltaCA * (1-percentAdultParent))*R_C1 - (deltaAS)*R_CA1
-  dD_CA1 <- alphaA1 * gamma * I_CA1
-  dS_CA2 <- omega * R_CA1 + b * omega * R_CA2 - (ss * lambdaCA + vaccCA(t)) * S_CA2 + (deltaCA * (1-percentAdultParent))*S_C2 - (deltaAS)*S_CA2
-  dE_CA2 <- ss * lambdaCA * S_CA2 - (epsilon + vaccCA(t)) * E_CA2 + (deltaCA * (1-percentAdultParent))*E_C2 - (deltaAS)*E_CA2
-  dI_CA2 <- epsilon * E_CA2 - gamma * I_CA2 + (deltaCA * (1-percentAdultParent))*I_C2 - (deltaAS)*I_CA2
-  dR_CA2 <- vaccCA(t) * (S_CA1 + E_CA1 + R_CA1 + S_CA2 + E_CA2) + gamma * I_CA2 - b * omega * R_CA2 + (deltaCA * (1-percentAdultParent))*R_C2 - (deltaAS)*R_CA2
-  dD_CA2 <- alphaA2 * gamma * I_CA2
+  dS_CA2 <- omega*R_CA1 + b*omega*R_CA2 - (ss*lambdaCA + vaccCA(t))*S_CA2 + deltaCA*(1 - percentAdultParent)*S_C2 - deltaAS*S_CA2
+  dE_CA2 <- ss*lambdaCA*S_CA2 - (epsilon + vaccCA(t))*E_CA2 + deltaCA*(1 - percentAdultParent)*E_C2 - deltaAS*E_CA2
+  dI_CA2 <- (1-probHA2)*epsilon*E_CA2 - gamma*I_CA2 + deltaCA*(1 - percentAdultParent)*I_C2 - deltaAS*I_CA2
+  dH_CA2 <- probHA2*epsilon*E_CA2 - gamma*H_CA2 + deltaCA*(1 - percentAdultParent)*H_C2 - deltaAS*H_CA2
+  dR_CA2 <- vaccCA(t)*(S_CA1 + E_CA1 + R_CA1 + S_CA2 + E_CA2) + gamma*I_CA2 + (1 - alphaA)*gamma*H_CA2 - b*omega*R_CA2 + deltaCA*(1 - percentAdultParent)*R_C2 - deltaAS*R_CA2
+  dD_CA2 <- alphaA*gamma*H_CA2
   
-  #parent updates
-  dS_P1 <- -(lambdaP + vaccP(t)) * S_P1 + (deltaCA * percentAdultParent)*S_C1 - (deltaAS)*S_P1
-  dE_P1 <- lambdaP * S_P1 - (epsilon + vaccP(t)) * E_P1 + (deltaCA * percentAdultParent)*E_C1 - (deltaAS)*E_P1
-  dI_P1 <- epsilon * E_P1 - gamma * I_P1 + (deltaCA * percentAdultParent)*I_C1 - (deltaAS)*I_P1
-  dR_P1 <- gamma * I_P1 - (omega + vaccP(t)) * R_P1 + (deltaCA * percentAdultParent)*R_C1 - (deltaAS)*R_P1
-  dD_P1 <- alphaA1 * gamma * I_P1
-  dS_P2 <- omega * R_P1 + b * omega * R_P2 - (ss * lambdaP + vaccP(t)) * S_P2 + (deltaCA * percentAdultParent)*S_C2 - (deltaAS)*S_P2
-  dE_P2 <- ss * lambdaP * S_P2 - (epsilon + vaccP(t)) * E_P2 + (deltaCA * percentAdultParent)*E_C2 - (deltaAS)*E_P2
-  dI_P2 <- epsilon * E_P2 - gamma * I_P2 + (deltaCA * percentAdultParent)*I_C2 - (deltaAS)*I_P2
-  dR_P2 <- vaccP(t) * (S_P1 + E_P1 + R_P1 + S_P2 + E_P2) + gamma * I_P2 - b * omega * R_P2 + (deltaCA * percentAdultParent)*R_C2 - (deltaAS)*R_P2
-  dD_P2 <- alphaA2 * gamma * I_P2
+  # parents
+  dS_P1 <- -(lambdaP + vaccP(t))*S_P1 + deltaCA*percentAdultParent*S_C1 - deltaAS*S_P1
+  dE_P1 <- lambdaP*S_P1 - (epsilon + vaccP(t))*E_P1 + deltaCA*percentAdultParent*E_C1 - deltaAS*E_P1
+  dI_P1 <- (1-probHA1)*epsilon*E_P1 - gamma*I_P1 + deltaCA*percentAdultParent*I_C1 - deltaAS*I_P1
+  dH_P1 <- probHA1*epsilon*E_P1 - gamma*H_P1 + deltaCA*percentAdultParent*H_C1 - deltaAS*H_P1
+  dR_P1 <- gamma*I_P1 + (1 - alphaA)*gamma*H_P1 - (omega + vaccP(t))*R_P1 + deltaCA*percentAdultParent*R_C1 - deltaAS*R_P1
+  dD_P1 <- alphaA*gamma*H_P1
   
+  dS_P2 <- omega*R_P1 + b*omega*R_P2 - (ss*lambdaP + vaccP(t))*S_P2 + deltaCA*percentAdultParent*S_C2 - deltaAS*S_P2
+  dE_P2 <- ss*lambdaP*S_P2 - (epsilon + vaccP(t))*E_P2 + deltaCA*percentAdultParent*E_C2 - deltaAS*E_P2
+  dI_P2 <- (1-probHA2)*epsilon*E_P2 - gamma*I_P2 + deltaCA*percentAdultParent*I_C2 - deltaAS*I_P2
+  dH_P2 <- probHA2*epsilon*E_P2 - gamma*H_P2 + deltaCA*percentAdultParent*H_C2 - deltaAS*H_P2
+  dR_P2 <- vaccP(t)*(S_P1 + E_P1 + R_P1 + S_P2 + E_P2) + gamma*I_P2 + (1 - alphaA)*gamma*H_P2 - b*omega*R_P2 + deltaCA*percentAdultParent*R_C2 - deltaAS*R_P2
+  dD_P2 <- alphaA*gamma*H_P2
   
-  # senior updates
-  dS_S1 <- -(lambdaS + vaccS(t)) * S_S1 + (deltaAS)*(S_CA1 + S_P1) - (deltaSC)*S_S1
-  dE_S1 <- lambdaS * S_S1 - (epsilon + vaccS(t)) * E_S1 + (deltaAS)*(E_CA1 + E_P1) - (deltaSC)*E_S1
-  dI_S1 <- epsilon * E_S1 - gamma * I_S1 + (deltaAS)*(I_CA1 + S_P1) - (deltaSC)*I_S1
-  dR_S1 <- gamma * I_S1 - (omega + vaccS(t)) * R_S1 + (deltaAS)*(R_CA1 + R_P1) - (deltaSC)*R_S1
-  dD_S1 <- alphaS1 * gamma * I_S1
-  dS_S2 <- omega * R_S1 + b * omega * R_S2 - (ss * lambdaS + vaccS(t)) * S_S2 + (deltaAS)*(S_CA2 + S_P2) - (deltaSC)*S_S2
-  dE_S2 <- ss * lambdaS * S_S2 - (epsilon + vaccS(t)) * E_S2 + (deltaAS)*(E_CA2 + E_P2) - (deltaSC)*E_S2
-  dI_S2 <- epsilon * E_S2 - gamma * I_S2 + (deltaAS)*(I_CA2 + I_P2) - (deltaSC)*I_S2
-  dR_S2 <- vaccS(t) * (S_S1 + E_S1 + R_S1 + S_S2 + E_S2) + gamma * I_S2 - b * omega * R_S2 + (deltaAS)*(R_CA2 + R_P2) - (deltaSC)*R_S2
-  dD_S2 <- alphaS2 * gamma * I_S2
+  # seniors
+  dS_S1 <- -(lambdaS + vaccS(t))*S_S1 + deltaAS*(S_CA1 + S_P1) - deltaSC*S_S1
+  dE_S1 <- lambdaS*S_S1 - (epsilon + vaccS(t))*E_S1 + deltaAS*(E_CA1 + E_P1) - deltaSC*E_S1
+  dI_S1 <- (1-probHS1)*epsilon*E_S1 - gamma*I_S1 + deltaAS*(I_CA1 + I_P1) - deltaSC*I_S1
+  dH_S1 <- probHS1*epsilon*E_S1 - gamma*H_S1 + deltaAS*(H_CA1 + H_P1) - deltaSC*H_S1
+  dR_S1 <- gamma*I_S1 + (1 - alphaS)*gamma*H_S1 - (omega + vaccS(t))*R_S1 + deltaAS*(R_CA1 + R_P1) - deltaSC*R_S1
+  dD_S1 <- alphaS*gamma*H_S1
+  
+  dS_S2 <- omega*R_S1 + b*omega*R_S2 - (ss*lambdaS + vaccS(t))*S_S2 + deltaAS*(S_CA2 + S_P2) - deltaSC*S_S2
+  dE_S2 <- ss*lambdaS*S_S2 - (epsilon + vaccS(t))*E_S2 + deltaAS*(E_CA2 + E_P2) - deltaSC*E_S2
+  dI_S2 <- (1-probHS2)*epsilon*E_S2 - gamma*I_S2 + deltaAS*(I_CA2 + I_P2) - deltaSC*I_S2
+  dH_S2 <- probHS2*epsilon*E_S2 - gamma*H_S2 + deltaAS*(H_CA2 + H_P2) - deltaSC*H_S2
+  dR_S2 <- vaccS(t)*(S_S1 + E_S1 + R_S1 + S_S2 + E_S2) + gamma*I_S2 + (1 - alphaS)*gamma*H_S2 - b*omega*R_S2 + deltaAS*(R_CA2 + R_P2) - deltaSC*R_S2
+  dD_S2 <- alphaS*gamma*H_S2
   
   # Return list of gradients
-  list(c(dS_C1, dE_C1, dI_C1, dR_C1, dD_C1,
-        dS_C2, dE_C2, dI_C2, dR_C2, dD_C2,
-        dS_CA1, dE_CA1, dI_CA1, dR_CA1, dD_CA1,
-        dS_CA2, dE_CA2, dI_CA2, dR_CA2, dD_CA2,
-        dS_P1, dE_P1, dI_P1, dR_P1, dD_P1,
-        dS_P2, dE_P2, dI_P2, dR_P2, dD_P2,
-        dS_S1, dE_S1, dI_S1, dR_S1, dD_S1,
-        dS_S2, dE_S2, dI_S2, dR_S2, dD_S2))
-  
-}
-
-#### Seasonality ###
-
-#### Seasonal function ####
-seas_matrix <- function(mu_janapr, mu_mayaug, mu_sepdec){
-  n <- 365
-  x <- 0:(n-1)/(n-1); #normalizing sequence
-  k<- 0:6/6 # number of parameters wanted & normalized 
-  # below is a cubic spline 
-  matrix <- cSplineDes(x, k, ord = 4, derivs=0) %>%
-    as.data.frame() %>%
-    mutate(day = 1:365) %>%
-    rename(JanApr = V1, MayAug = V2, SepDec = V3) %>%
-    pivot_longer(JanApr:SepDec, values_to = "Value", names_to = "Season") %>%
-    mutate(spline_scalar = case_when(
-      Season == "JanApr" ~ mu_janapr,
-      Season == "MayAug" ~ mu_mayaug,
-      Season == "SepDec" ~ mu_sepdec,
-    )) %>%
-    mutate(Value = spline_scalar*Value) %>%
-    group_by(day) %>% 
-    summarise(Value = mean(Value)) %>%
-    ungroup() %>%
-    mutate(day = if_else(day == 365, 0, day))
-  return(matrix)
-}
-
-seas_function <- function(t, matrix){
-  matrix <- matrix %>%
-    filter(day == t %% 365)
-  mu <- matrix$Value[1]
-  return(mu)
-}
-
-#### loglik ####
-loglik <- function(
-    mu_janapr, mu_mayaug, mu_sepdec, 
-    alphaC1, alphaC2, alphaA1, alphaA2, alphaS1, alphaS2,
-    sig_dist
-){
+  list(c(
+    dS_C1, dE_C1, dI_C1, dH_C1, dR_C1, dD_C1,
+    dS_C2, dE_C2, dI_C2, dH_C2, dR_C2, dD_C2,
+    dS_CA1, dE_CA1, dI_CA1, dH_CA1, dR_CA1, dD_CA1,
+    dS_CA2, dE_CA2, dI_CA2, dH_CA2, dR_CA2, dD_CA2,
+    dS_P1, dE_P1, dI_P1, dH_P1, dR_P1, dD_P1,
+    dS_P2, dE_P2, dI_P2, dH_P2, dR_P2, dD_P2,
+    dS_S1, dE_S1, dI_S1, dH_S1, dR_S1, dD_S1,
+    dS_S2, dE_S2, dI_S2, dH_S2, dR_S2, dD_S2
+  ))
   
   
-  # First, feed in standard parms
-  paras <- run_parms
-  # update death rate, hospitalization risks
-  paras["alphaC1"] <- alpha
-  paras["risk_old_h"] <- risk_old_h
-  paras["risk_child_h"] <- risk_child_h
-  # set seasonality
-  set_mat <- seas_matrix(mu_janapr, mu_mayaug, mu_sepdec)
-  ## make sure mu is defined globally so that it actually passes into the seir function
-  mu <<- function(t){
-    seas_function(t, matrix = set_mat)
-  }
-  
-  # set initial conditions
-  init <- run_init
-  
-  # Set times
-  times <- 92:481
-  
-  # vec_print <- c(mu_janfeb, mu_marapr, mu_mayjun, 
-  #                mu_julaug, mu_septoct, mu_novdec,
-  #                alpha,
-  #                sig_dist)
-  # 
-  # print("------- PARAS --------")
-  # print(vec_print)
-  
-  # Run the model 
-  out_calib1 <- ode(y=init, func = seir, times=times, parms = paras) %>%
-    as.data.frame() %>%
-    as_tibble() %>%
-    select(time, 
-           Hosp_1_child, Hosp_2_child,Hosp_3_child,
-           D_1_child, D_2_child, D_2E_child, D_3_child, D_3E_child,
-           Hosp_1_adult, Hosp_2_adult,Hosp_3_adult,
-           D_1_adult, D_2_adult, D_2E_adult, D_3_adult, D_3E_adult,
-           Hosp_1_old, Hosp_2_old,Hosp_3_old,
-           D_1_old, D_2_old, D_2E_old, D_3_old, D_3E_old,
-           Hosp_1_hr, Hosp_2_hr, Hosp_3_hr,
-           D_1_hr, D_2_hr, D_2E_hr, D_3_hr, D_3E_hr
-    ) %>%
-    group_by(time) %>%
-    reframe(
-      `inc hosp_0-64` = Hosp_1_adult + Hosp_2_adult + Hosp_3_adult + Hosp_1_child + Hosp_2_child + Hosp_3_child + Hosp_1_hr + Hosp_2_hr + Hosp_3_hr,
-      `inc nhsn_0-17` = Hosp_1_child + Hosp_2_child + Hosp_3_child,
-      `inc nhsn_18-64` = Hosp_1_adult + Hosp_2_adult + Hosp_3_adult + Hosp_1_hr + Hosp_2_hr + Hosp_3_hr,
-      `inc hosp_65-130` = Hosp_1_old + Hosp_2_old + Hosp_3_old,
-      `inc nhsn_65-130` = Hosp_1_old + Hosp_2_old + Hosp_3_old,
-      `inc hosp_0-130` = `inc hosp_0-64` + `inc hosp_65-130`,
-      `inc death_0-64` = D_1_adult + D_2_adult + D_2E_adult + D_3_adult + D_3E_adult + D_1_child + D_2_child + D_2E_child +  D_3_child + D_3E_child + D_1_hr + D_2_hr + D_2E_hr + D_3_hr + D_3E_hr,
-      `inc death_65-130` = D_1_old + D_2_old + D_2E_old +  D_3_old + D_3E_old,
-      `inc death_0-130` = `inc death_0-64` + `inc death_65-130`
-    ) %>%
-    ungroup() %>%
-    pivot_longer(-time) %>%
-    separate(name, into = c("target", "age_group"), sep = "_") %>%
-    group_by(target, age_group) %>%
-    arrange(time) %>%
-    mutate(value = value - lag(value, 7)) %>% ## weekly
-    ungroup() %>%
-    mutate(date = as.Date("01-01-2024", "%m-%d-%Y") + time) %>%
-    select(-time) %>%
-    right_join(data, by = c("target", "age_group", "date")) %>%
-    # Normalize the data. Here, I'm using the maximum in the observed data for each target and 
-    # age combination. This step is very important. Without it, the MLE weights targets and age differently,
-    # and doesn't converge. 
-    group_by(target, age_group) %>%
-    arrange(date) %>%
-    mutate(max_normal = max(observation, na.rm = T),
-           observation = observation/max_normal,
-           value = value/max_normal) %>%
-    filter(!is.na(observation), !is.na(value)) %>%
-    ungroup()
-  
-  # Now get the negative log likelihood. Note we are concurrently fitting the sd
-  ll <- -sum(dnorm(x=out_calib1$value,mean=out_calib1$observation,sd=sig_dist,log=TRUE))
-  
-  # This code ensures that if the output of the log likelihood is NA, the MLE won't stop. Instead it will return
-  # an extremely large, positive value of the negative log likelihood and keep iterating.
-  ll_final = if_else(is.na(ll), 10^6, ll)
-  
-  return(ll_final)
 }

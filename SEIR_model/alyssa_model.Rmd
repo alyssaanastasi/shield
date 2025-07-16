@@ -26,33 +26,7 @@ source("alyssa_seir.R")
 source("alyssa_SEIR_params.R")
 source("alyssa_pertussis_seir.R")
 source("alyssa_seasonality.R")
-```
-
-
-## Basic Parms
-```{r}
-times <- 1:4018
-PopT <- 1.2*10^7 ## 20 million total
-
-percentAdult <- 5398257/12812508
-percentParent <- (883257+109092+70752+265126)/4998395
-percentAdultParent <- percentParent / percentAdult
-Pop_child <- PopT/3
-Pop_childless_adult <- PopT/3 * (1-percentAdultParent)
-Pop_parent <- PopT/3 * percentAdultParent
-Pop_senior <- PopT/3
-total_pop <- c(
-  "Adults (50+)" = Pop_senior,
-  "Adults with Children (Parents)" = Pop_parent,
-  "Childless Adults" = Pop_childless_adult,
-  "Children" = Pop_child
-)
-
-get_parms <- function(parms, vacc_type, disease) {
-  vaccs <- set_vacc(disease, vacc_type)
-  full_parms <- c(parms, vaccs)
-  return(full_parms)
-}
+source("mortality_data.R")
 ```
 
 ## DataFrame Set Up Function Using ODE
@@ -168,7 +142,6 @@ infection_plot_prop <- function(df, title, min_time, max_time) {
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.5, "cm"))
 }
-
 ```
 
 ## Vaccination Function
@@ -234,18 +207,16 @@ set_vacc <- function(disease, type) {
 
 ## Callibrate Seasonality
 ```{R}
-covid_mortality <- read.csv("~/Desktop/shield/data/COVID_mortality.csv") %>%
-                  mutate(date = mdy(date))
 covid_parms_full = get_parms(covid_parms, "No Vaccination", "COVID-19")
 
-start = list(
-  mu_janmar = 0.01, 
-  mu_aprjun = 0.01, 
-  mu_julsep = 0.01, 
-  mu_octdec = 0.01, 
+cov_start = list(
+  mu_janmar = 0.378, 
+  mu_aprjun = 0.378, 
+  mu_julsep = 0.378, 
+  mu_octdec = 0.378, 
   sig_dist = 0.2)
 
-upper_limit = list(
+cov_upper_limit = list(
   mu_janmar = 1.5, 
   mu_aprjun = 1.5, 
   mu_julsep = 1.5, 
@@ -253,30 +224,30 @@ upper_limit = list(
   sig_dist = 2
 )
 
-lower_limit = list(
-  mu_janmar = 0, 
-  mu_aprjun = 0, 
-  mu_julsep = 0, 
-  mu_octdec = 0, 
+cov_lower_limit = list(
+  mu_janmar = 0.01, 
+  mu_aprjun = 0.01, 
+  mu_julsep = 0.01, 
+  mu_octdec = 0.01, 
   sig_dist = 0.05
 )
 
-m1_A = mle2(minuslogl = loglik,
-              start = start,
+cov_m1_A = mle2(minuslogl = loglik,
+              start = cov_start,
               data = covid_mortality,
               method = "L-BFGS-B",
               #fixed = list(mu = 0.03),
-              upper= upper_limit,
-              lower = lower_limit,
-              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(start))))
+              upper= cov_upper_limit,
+              lower = cov_lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(cov_start))))
 ```
 
 ```{R}
 full <- summary(m1_A)
 dt <- data.table::as.data.table(coef(full), .keep.rownames = "word")
 ```
-## Run Model
 
+## Run Model
 ```{r}
 COVIDNoVac <- run_ode(init, seir, times, covid_parms, "No Vaccination", "COVID-19")
 COVIDCurrVac <- run_ode(init, seir, times, covid_parms, "Current Vaccination", "COVID-19")
@@ -316,6 +287,45 @@ ggsave("figures/COVIDplotInfections10yrprop.png", width = 10, height = 7, dpi = 
 
 
 ### Flu
+
+## Calibrate Seasonality 
+
+```{R}
+
+flu_parms_full = get_parms(flu_parms, "No Vaccination", "Flu")
+
+flu_start = list(
+  mu_janmar = 0.04, 
+  mu_aprjun = 0.04, 
+  mu_julsep = 0.04, 
+  mu_octdec = 0.04, 
+  sig_dist = 0.2)
+
+flu_upper_limit = list(
+  mu_janmar = 1.5, 
+  mu_aprjun = 1.5, 
+  mu_julsep = 1.5, 
+  mu_octdec = 1.5, 
+  sig_dist = 2
+)
+
+flu_lower_limit = list(
+  mu_janmar = 0.01, 
+  mu_aprjun = 0.01, 
+  mu_julsep = 0.01, 
+  mu_octdec = 0.01, 
+  sig_dist = 0.05
+)
+
+flu_m1_A = mle2(minuslogl = loglik,
+              start = flu_start,
+              data = flu_mortality,
+              method = "L-BFGS-B",
+              #fixed = list(mu = 0.03),
+              upper= flu_upper_limit,
+              lower = flu_lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(flu_start))))
+```
 
 ```{R}
 FLUNoVac <- run_ode(init, seir, times, flu_parms, "No Vaccination", "Flu")

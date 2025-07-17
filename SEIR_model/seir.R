@@ -7,12 +7,10 @@ seir <- function(t, y, pars){
   # For COVID, Flu, & RSV
   # S -> E -> I -> R -> S2
   #        -> H (Hospitalized/Severe) -> R OR D
+  
   # Parameters
-  # mu <- pars$mu[1]  # probability of transition given contact
-    # don't load in mu because seasonality calibration creates a global function 
-  # - is this the best way though? 
-
-  epsilon <- pars$epsilon[1]  # how long it takes to move from e to i
+  mu <- pars$mu[1]
+  epsilon <- pars$epsilon[1] # how long it takes to move from e to i
   probHC1 <- pars$probHC1[1] #probability of severe infection/hospitalization with no prior immunity
   probHC2 <- pars$probHC2[1] #probability of severe infection/hospitalization with prior immunity
   probHA1 <- pars$probHA1[1] 
@@ -109,7 +107,7 @@ seir <- function(t, y, pars){
   D_S2 <- y[48]
   
   # Group totals
-  sumIC <- I_C1 + si*I_C2 + H_C1 + si*H_C2 #As of right now, this assumes hospitalized people are just as infectious as normal infected people ?? 
+  sumIC <- I_C1 + si*I_C2 + H_C1 + si*H_C2 #As of right now, this assumes hospitalized people are as infectious as normal infected people 
   popC <- S_C1 + E_C1 + I_C1 + H_C1 + R_C1 + S_C2 + E_C2 + I_C2 + H_C2 + R_C2
   sumICA <- I_CA1 + si*I_CA2 + H_CA1 + si*H_CA2
   popCA <- S_CA1 + E_CA1+ I_CA1 + H_CA1 + R_CA1 + S_CA2 + E_CA2 + I_CA2 + H_CA2 + R_CA2
@@ -210,4 +208,24 @@ seir <- function(t, y, pars){
   ))
   
   
+}
+
+#### Type III functional response ####
+
+type_III_resp <- function (t, Vmax, WVH, k) {
+  
+  return(Vmax*(t^k)/((WVH^k) + (t^k)))
+}
+
+#### Vaccination ####
+
+vacc_weekly <- function (Vmax, WVH, k){
+  datOut <- tibble(Week = 1:60, Vac = type_III_resp(1:60, Vmax,WVH, k)) %>%
+    mutate(dailyVac =  c(Vac[1],diff(Vac)),
+           VacCumSum = cumsum(dailyVac)) %>% 
+    arrange(Week) %>%
+    mutate(Day = Week*7-7+1, dailyVac=dailyVac/7)
+  
+  vaccF <- splinefun(x = datOut$Day, y = datOut$dailyVac)
+  return(vaccF)
 }

@@ -225,10 +225,10 @@ cov_upper_limit = list(
 )
 
 cov_lower_limit = list(
-  mu_janmar = 0.01, 
-  mu_aprjun = 0.01, 
-  mu_julsep = 0.01, 
-  mu_octdec = 0.01, 
+  mu_janmar = 0.1, 
+  mu_aprjun = 0.1, 
+  mu_julsep = 0.1, 
+  mu_octdec = 0.1, 
   sig_dist = 0.05
 )
 

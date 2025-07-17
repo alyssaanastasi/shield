@@ -77,13 +77,6 @@ flu_parms <- c(epsilon = 1, omega = 1/(15*30),  b = 1, gammaI = 1/7, gammaH = 1/
                cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
                ss = 0.5, si = 0.5)
 
-pertussis_parms <- c(epsilon = 1/7, omega = 1/(55*365),  b = 1,  mu = 10*(0.11/5), gamma = 1/(3*7),     
-                     alphaC1 = 0.005, alphaC2 = 0,
-                     alphaA1 = 0, alphaA2 = 0, 
-                     alphaS1 = 0, alphaS2 = 0,
-                     cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
-                     ss = 0.5, si = 0.5)
-
 rsv_parms <- c(epsilon = 1/5, omega = 1/(5*30),  b = 1,  mu = 10*(0.27/5), gammaI = 1/5, gammaH = 0.2, #gammaH placeholder    
                alphaC = 0.0015, alphaA = 0.005, alphaS = 0.025,
                probHC1 = 0.00013, probHC2 = .5*0.01, # source of reduction rate is CDC 
@@ -91,6 +84,13 @@ rsv_parms <- c(epsilon = 1/5, omega = 1/(5*30),  b = 1,  mu = 10*(0.27/5), gamma
                probHS1 = 0.0012, probHS2 = .58*0.2,
                cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
                ss = 0.5, si = 0.5)
+
+pertussis_parms <- c(epsilon = 1/7, omega = 1/(55*365),  b = 1,  mu = 10*(0.11/5), gamma = 1/(3*7),     
+                     alphaC1 = 0.005, alphaC2 = 0,
+                     alphaA1 = 0, alphaA2 = 0, 
+                     alphaS1 = 0, alphaS2 = 0,
+                     cCC = 2.1, cCCA = 1, cCP = 2, cCS = 0.2, cAA = 3, cSA = 0.5, cSS = 1,
+                     ss = 0.5, si = 0.5)
 
 
 

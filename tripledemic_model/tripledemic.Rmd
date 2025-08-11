@@ -1,0 +1,111 @@
+---
+title: "Tripledemic Model"
+author: "Alyssa Anastasi"
+date: "2025-08-05"
+output: html_document
+---
+
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(deSolve)
+library(tidyverse)
+library(MetBrewer)
+library(directlabels)
+library(cowplot)
+library(viridis)
+library(RColorBrewer)
+library(ggrepel)
+library(spatstat.utils)
+library(paletteer)
+library(bbmle)
+library(mgcv)
+source("seir.R")
+source("seir_params.R")
+source("seir_RSV.R")
+source("seir_COV.R")
+```
+
+## Test Indiv. Models
+```{R}
+df_RSV <- ode(y=init_rsv, func = seir_RSV, times=times, parms = rsv_parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(type = case_when(
+        grepl("^S_", name) ~ "Susceptible",
+        grepl("E_", name) ~ "Exposed",
+        grepl("I_", name) ~ "Infected",
+        grepl("H_", name) ~ "Hospitalized",
+        grepl("D_", name) ~ "Dead"))
+```
+
+```{R}
+df_RSV %>% filter(type == "Infected") %>% 
+  ggplot(aes(x=time,y=value, color=name)) + 
+  geom_line() + 
+  facet_wrap(~ age_group)
+```
+
+```{R}
+df_COV <- ode(y=init_COV, func = seir_COV, times=times, parms = COV_parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(type = case_when(
+        grepl("^S_", name) ~ "Susceptible",
+        grepl("E_", name) ~ "Exposed",
+        grepl("I_", name) ~ "Infected",
+        grepl("H_", name) ~ "Hospitalized",
+        grepl("D_", name) ~ "Dead"))
+```
+
+```{R}
+df_COV %>% filter(type == "Infected") %>% 
+  ggplot(aes(x=time,y=value, color=name)) + 
+  geom_line() + 
+  facet_wrap(~ age_group)
+```
+
+```{R}
+df <- ode(y=init, func = seir, times=times, parms = parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(disease_group = case_when(
+      grepl("RSV", name) ~ "RSV",
+      grepl("COV", name) ~ "COVID",
+      grepl("FLU", name) ~ "FLU")) %>%
+  mutate(type = case_when(
+      grepl("^S_", name) ~ "Susceptible",
+      grepl("E_", name) ~ "Exposed",
+      grepl("I_", name) ~ "Infected",
+      grepl("H_", name) ~ "Hospitalized",
+      grepl("D_", name) ~ "Dead"))
+
+  
+```
+
+```{R}
+df %>% filter(type == "Infected") %>% 
+  ggplot(aes(x=time,y=value, color=name)) + 
+  geom_line() + 
+  facet_grid(rows = vars(age_group), cols = vars(disease_group), drop = FALSE)
+```
+
+
+```{R}
+df %>% filter(disease_group == "FLU") %>% filter(type == "Infected") %>% 
+  ggplot(aes(x=time,y=value, color=name)) + 
+  geom_line() + 
+  facet_grid(rows = vars(age_group), cols = vars(disease_group), drop = FALSE)
+```

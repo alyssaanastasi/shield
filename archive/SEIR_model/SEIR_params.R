@@ -3,7 +3,7 @@ library(tidyverse)
 
 #### General parameters ####
 
-times <- 1:4018
+times <- 1:5
 PopT <- 1.2*10^7 ## 20 millions total
 
 percentAdult <- 5398257/12812508

@@ -15,7 +15,7 @@ Pop_senior <- PopT/4
 
 
 #Set contact rates globally
-data(polymod)
+data(polymod, package = "socialmixr")
 cm <- contact_matrix(polymod, countries = "United Kingdom", age.limits = c(0, 6, 19, 66), symmetric = TRUE)
 cmat <- cm[["matrix"]]
 C_vals <- cmat["[0,6)", ]
@@ -110,18 +110,18 @@ total_pop <- c(
 )
 
 parms <- c( # 10*(0.27/5)
-               beta_RSV=.4, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/5, gammaH_RSV = 1/15, #gammaH placeholder    
-               alphaC_RSV = 0.0015, alphaOC_RSV = 0.0015, alphaA_RSV = 0.005, alphaS_RSV = 0.025,
-               probHC_RSV = 0.00013, probHC_RSV_vax = .5*0.01, # source of reduction rate is CDC 
-               probHOC_RSV = 0.00013, probHOC_RSV_vax = .5*0.01,
-               probHA_RSV = 0.00017, probHA_RSV_vax = .56*0.035,
-               probHS_RSV = 0.0012, probHS_RSV_vax = .58*0.2,
+               beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
+               alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
+               probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
+               probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
+               probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
+               probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
                ss_RSV = 0.5, si_RSV = 0.5,
                vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
-               ve_RSV = .88,
+               ve_RSV = .81,
             
               # 10*(0.189)/5
-              beta_COV=.4, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+              beta_COV=0.032, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
               alphaC_COV = 0.0015, alphaOC_COV = 0.0015, alphaA_COV = 0.0015, alphaS_COV = 0.025,
               probHC_COV = 0.01, probHC_COV_vax = .3*0.01, # source of reduction rate is CDC 
               probHOC_COV = 0.01, probHOC_COV_vax = .3*0.01,
@@ -132,7 +132,7 @@ parms <- c( # 10*(0.27/5)
               ve_COV = .94,
             
               #10*((0.257 + 0.305)/2)/7
-              beta_FLU=.4, epsilon_FLU = 1/3, omega_FLU = 1/(15*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+              beta_FLU=0.015, epsilon_FLU = 1/3, omega_FLU = 1/(15*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
               alphaC_FLU = 0.00001, alphaOC_FLU = 0.00001, alphaA_FLU = 0.00005, alphaS_FLU = 0.001,
               probHC_FLU = 0.00013, probHC_FLU_vax = .5*0.00013, # source of reduction rate is CDC 
               probHOC_FLU = 0.00013, probHOC_FLU_vax = .5*0.00013,

@@ -117,7 +117,7 @@ parms <- c( # 10*(0.27/5)
                probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
                probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
                ss_RSV = 0.5, si_RSV = 0.5,
-               vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
+               vaccC_RSV = 0.3, vaccOC_RSV = 0.3, vaccA_RSV = 0.3, vaccS_RSV = 0.3,
                ve_RSV = .81,
             
               # 10*(0.189)/5
@@ -128,7 +128,7 @@ parms <- c( # 10*(0.27/5)
               probHA_COV = 0.035, probHA_COV_vax = .5*0.035,
               probHS_COV = 0.2, probHS_COV_vax = .5*0.2,
               ss_COV = 0.5, si_COV = 0.5,
-              vaccC_COV = 0, vaccOC_COV = 0, vaccA_COV = 0, vaccS_COV = 0,
+              vaccC_COV = 0.3, vaccOC_COV = 0.3, vaccA_COV = 0.3, vaccS_COV = 0.3,
               ve_COV = .94,
             
               #10*((0.257 + 0.305)/2)/7
@@ -139,7 +139,7 @@ parms <- c( # 10*(0.27/5)
               probHA_FLU = 0.00017, probHA_FLU_vax = 56*0.00017,
               probHS_FLU = 0.0012, probHS_FLU_vax = .58*0.0012,
               ss_FLU = 0.5, si_FLU = 0.5,
-              vaccC_FLU = 0, vaccOC_FLU = 0, vaccA_FLU = 0, vaccS_FLU = 0,
+              vaccC_FLU = 0.3, vaccOC_FLU = 0.3, vaccA_FLU = 0.3, vaccS_FLU = 0.3,
               ve_FLU = 0.9)
 
 

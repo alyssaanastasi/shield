@@ -96,10 +96,14 @@ df <- ode(y=init, func = seir, times=times, parms = parms) %>%
 ```
 
 ```{R}
-df %>% filter(type == "Infected") %>% 
-  ggplot(aes(x=time,y=value, color=name)) + 
+plot <- df %>% filter(type == "Infected") %>% 
+  group_by(disease_group, time) %>%
+  summarise(value = sum(value)) %>%
+  ungroup() %>%
+  ggplot(aes(x=time,y=value)) + 
   geom_line() + 
-  facet_grid(rows = vars(age_group), cols = vars(disease_group), drop = FALSE)
+  facet_wrap(~disease_group, scales = "free")
+plot
 ```
 
 

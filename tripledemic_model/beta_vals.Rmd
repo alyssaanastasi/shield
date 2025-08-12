@@ -194,6 +194,8 @@ for (i in seq_along(beta_seq)){
 
 # COV
 
+- Change R0 to 2.3 !!
+
 ```{r}
 # We write down the matrices to compute R0 (WITHOUT isolation incorporated -- including T compartments gives a singular matrix )
 
@@ -540,8 +542,7 @@ beta_seq <- seq(0.01,0.2,0.001)
 
 R0_grid <- NULL
 
-# FLU target RO = 3.0
-# https://pubmed.ncbi.nlm.nih.gov/27716828/
+# FLU target RO = 1.28
 
 for (i in seq_along(beta_seq)){
   

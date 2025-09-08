@@ -5,7 +5,7 @@ date: "2025-08-11"
 output: html_document
 ---
 
-```{r}
+```{r, warning = FALSE}
 source("seir_params.R")
 library(epimdr2)
 ```
@@ -27,6 +27,8 @@ istates=c("E_C_RSV_vax", "I_C_RSV_vax", "H_C_RSV_vax",
           "E_S_RSV_vax", "I_S_RSV_vax", "H_S_RSV_vax", 
           "E_S_RSV", "I_S_RSV", "H_S_RSV")
 
+#set up each lambda as quote
+
 ## a list that contains equations (as quotes) for completely new infections entering each infected compartment for each class
 flist=c(
   dE_C_RSV_vax=quote((beta_RSV*
@@ -34,7 +36,17 @@ flist=c(
                            cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                            cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                            cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) *
-                        vaccC_RSV * ve_RSV)*S_C),
+                        vaccC_RSV * ve_RSV)*S_C +
+                        (beta_RSV*
+                        (cCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccC_RSV * ve_RSV)*R_C_COV +
+                        (beta_RSV*
+                        (cCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccC_RSV * ve_RSV)*R_C_FLU ), # (lambda * vacc * VE)*S + (lambda * vacc * VE)*R_COV + (lambda * vacc * VE)*R_FLU
   dI_C_RSV_vax=quote(0),
   dH_C_RSV_vax=quote(0),
   dE_C_RSV=quote(((beta_RSV*
@@ -42,7 +54,17 @@ flist=c(
                         cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                         cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                         cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * 
-                      (1-vaccC_RSV))*S_C), 
+                      (1-vaccC_RSV))*S_C + 
+                   ((beta_RSV*
+                     (cCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccC_RSV))*R_C_COV +
+                   ((beta_RSV*
+                     (cCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccC_RSV))*R_C_FLU ), 
   dI_C_RSV=quote(0),
   dH_C_RSV=quote(0),
   dE_OC_RSV_vax=quote((beta_RSV*
@@ -50,7 +72,17 @@ flist=c(
                             cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                             cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                             cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) *
-                      vaccOC_RSV * ve_RSV)*S_OC),
+                      vaccOC_RSV * ve_RSV)*S_OC +
+                        (beta_RSV*
+                         (cOCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                            cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                            cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                            cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccOC_RSV * ve_RSV)*R_OC_COV +
+                        (beta_RSV*
+                         (cOCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                            cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                            cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                            cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccOC_RSV * ve_RSV)*R_OC_FLU),
   dI_OC_RSV_vax=quote(0),
   dH_OC_RSV_vax=quote(0),
   dE_OC_RSV=quote(((beta_RSV*
@@ -58,7 +90,17 @@ flist=c(
                          cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                          cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                          cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * 
-                     (1-vaccOC_RSV))*S_OC), 
+                     (1-vaccOC_RSV))*S_OC + 
+                   ((beta_RSV*
+                      (cOCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                         cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                         cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                         cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccOC_RSV))*R_OC_COV +
+                   ((beta_RSV*
+                      (cOCC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                         cOCOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                         cOCA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                         cOCS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccOC_RSV))*R_OC_FLU ), 
   dI_OC_RSV=quote(0),
   dH_OC_RSV=quote(0),
   dE_A_RSV_vax=quote((beta_RSV*
@@ -66,7 +108,17 @@ flist=c(
                            cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                            cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                            cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) *
-                       vaccA_RSV * ve_RSV)*S_A),
+                       vaccA_RSV * ve_RSV)*S_A +
+                        (beta_RSV*
+                        (cAC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccA_RSV * ve_RSV)*R_A_COV +
+                        (beta_RSV*
+                        (cAC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccA_RSV * ve_RSV)*R_A_FLU),
   dI_A_RSV_vax=quote(0),
   dH_A_RSV_vax=quote(0),
   dE_A_RSV=quote(((beta_RSV*
@@ -74,7 +126,17 @@ flist=c(
                         cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                         cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                         cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * 
-                    (1-vaccA_RSV))*S_A), 
+                    (1-vaccA_RSV))*S_A + 
+                   ((beta_RSV*
+                     (cAC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccA_RSV))*R_A_COV +
+                   ((beta_RSV*
+                     (cAC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cAOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cAA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cAS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccA_RSV))*R_A_FLU), 
   dI_A_RSV=quote(0),
   dH_A_RSV=quote(0),
   dE_S_RSV_vax=quote((beta_RSV*
@@ -82,7 +144,17 @@ flist=c(
                            cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                            cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                            cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) *
-                      vaccS_RSV * ve_RSV)*S_S),
+                      vaccS_RSV * ve_RSV)*S_S +
+                        (beta_RSV*
+                        (cSC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccS_RSV * ve_RSV)*R_S_COV +
+                        (beta_RSV*
+                        (cSC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                           cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                           cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                           cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS) * vaccS_RSV * ve_RSV)*R_S_FLU),
   dI_S_RSV_vax=quote(0),
   dH_S_RSV_vax=quote(0),
   dE_S_RSV=quote(((beta_RSV*
@@ -90,7 +162,17 @@ flist=c(
                         cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
                         cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
                         cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * 
-                    (1-vaccS_RSV))*S_S), 
+                    (1-vaccS_RSV))*S_S + 
+                   ((beta_RSV*
+                     (cSC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccS_RSV))*R_S_COV +
+                   ((beta_RSV*
+                     (cSC*(I_C_RSV + si_RSV*I_C_RSV_vax + H_C_RSV + si_RSV*H_C_RSV_vax)/popC + 
+                        cSOC*(I_OC_RSV + si_RSV*I_OC_RSV_vax + H_OC_RSV + si_RSV*H_OC_RSV_vax)/popOC + 
+                        cSA*(I_A_RSV + si_RSV*I_A_RSV_vax + H_A_RSV + si_RSV*H_A_RSV_vax)/popA + 
+                        cSS*(I_S_RSV + si_RSV*I_S_RSV_vax + H_S_RSV + si_RSV*H_S_RSV_vax)/popS)) * (1-vaccS_RSV))*R_S_FLU), 
   dI_S_RSV=quote(0),
   dH_S_RSV=quote(0))
   
@@ -145,14 +227,14 @@ for (i in 1:24){
 
 
 para = list( beta_RSV=10*(0.27/5), epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
-             alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
-             probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
-             probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
-             probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
-             probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
-             ss_RSV = 0.5, si_RSV = 0.5,
-             vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
-             ve_RSV = .81,
+               alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
+               probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
+               probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
+               probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
+               probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
+               ss_RSV = 0.5, si_RSV = 0.5,
+               vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
+               ve_RSV = .81,
              popC = Pop_children, popOC = Pop_older_children, popA = Pop_adult, popS = Pop_senior
            )
 
@@ -164,7 +246,9 @@ df = list(S_C = Pop_children, S_OC = Pop_older_children, S_A = Pop_adult, S_S = 
           E_A_RSV_vax=0, I_A_RSV_vax=0, H_A_RSV_vax=0, 
           E_A_RSV=0, I_A_RSV=0, H_A_RSV=0, 
           E_S_RSV_vax=0, I_S_RSV_vax=0, H_S_RSV_vax=0, 
-          E_S_RSV=0, I_S_RSV=0, H_S_RSV=0
+          E_S_RSV=0, I_S_RSV=0, H_S_RSV=0,
+          R_C_COV=0, R_OC_COV=0, R_A_COV=0, R_S_COV=0,
+          R_C_FLU=0, R_OC_FLU=0, R_A_FLU=0, R_S_FLU=0
           )
 
 nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
@@ -173,7 +257,7 @@ nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
 
 beta_seq <- seq(0.01,0.2,0.001)
 
-R0_grid <- NULL
+RSVR0_grid <- NULL
 
 # RSV target RO = 3.0
 # https://pubmed.ncbi.nlm.nih.gov/27716828/
@@ -184,7 +268,7 @@ for (i in seq_along(beta_seq)){
   
   R0 <- nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
 
-  R0_grid <- R0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
+  RSVR0_grid <- RSVR0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
   
 }
 
@@ -193,8 +277,6 @@ for (i in seq_along(beta_seq)){
 
 
 # COV
-
-- Change R0 to 2.3 !!
 
 ```{r}
 # We write down the matrices to compute R0 (WITHOUT isolation incorporated -- including T compartments gives a singular matrix )
@@ -211,6 +293,8 @@ istates=c("E_C_COV_vax", "I_C_COV_vax", "H_C_COV_vax",
           "E_S_COV_vax", "I_S_COV_vax", "H_S_COV_vax", 
           "E_S_COV", "I_S_COV", "H_S_COV")
 
+#set up each lambda as quote
+
 ## a list that contains equations (as quotes) for completely new infections entering each infected compartment for each class
 flist=c(
   dE_C_COV_vax=quote((beta_COV*
@@ -218,7 +302,17 @@ flist=c(
                            cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                            cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                            cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) *
-                        vaccC_COV * ve_COV)*S_C),
+                        vaccC_COV * ve_COV)*S_C +
+                       (beta_COV*
+                          (cCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccC_COV * ve_COV)*R_C_RSV +
+                       (beta_COV*
+                          (cCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccC_COV * ve_COV)*R_C_FLU ), # (lambda * vacc * VE)*S + (lambda * vacc * VE)*R_COV + (lambda * vacc * VE)*R_FLU
   dI_C_COV_vax=quote(0),
   dH_C_COV_vax=quote(0),
   dE_C_COV=quote(((beta_COV*
@@ -226,7 +320,17 @@ flist=c(
                         cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                         cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                         cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * 
-                    (1-vaccC_COV))*S_C), 
+                    (1-vaccC_COV))*S_C + 
+                   ((beta_COV*
+                       (cCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccC_COV))*R_C_RSV +
+                   ((beta_COV*
+                       (cCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccC_COV))*R_C_FLU ), 
   dI_C_COV=quote(0),
   dH_C_COV=quote(0),
   dE_OC_COV_vax=quote((beta_COV*
@@ -234,7 +338,17 @@ flist=c(
                             cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                             cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                             cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) *
-                         vaccOC_COV * ve_COV)*S_OC),
+                         vaccOC_COV * ve_COV)*S_OC +
+                        (beta_COV*
+                           (cOCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                              cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                              cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                              cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccOC_COV * ve_COV)*R_OC_RSV +
+                        (beta_COV*
+                           (cOCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                              cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                              cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                              cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccOC_COV * ve_COV)*R_OC_FLU),
   dI_OC_COV_vax=quote(0),
   dH_OC_COV_vax=quote(0),
   dE_OC_COV=quote(((beta_COV*
@@ -242,7 +356,17 @@ flist=c(
                          cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                          cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                          cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * 
-                     (1-vaccOC_COV))*S_OC), 
+                     (1-vaccOC_COV))*S_OC + 
+                    ((beta_COV*
+                        (cOCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                           cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                           cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                           cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccOC_COV))*R_OC_RSV +
+                    ((beta_COV*
+                        (cOCC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                           cOCOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                           cOCA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                           cOCS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccOC_COV))*R_OC_FLU ), 
   dI_OC_COV=quote(0),
   dH_OC_COV=quote(0),
   dE_A_COV_vax=quote((beta_COV*
@@ -250,7 +374,17 @@ flist=c(
                            cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                            cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                            cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) *
-                        vaccA_COV * ve_COV)*S_A),
+                        vaccA_COV * ve_COV)*S_A +
+                       (beta_COV*
+                          (cAC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccA_COV * ve_COV)*R_A_RSV +
+                       (beta_COV*
+                          (cAC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccA_COV * ve_COV)*R_A_FLU),
   dI_A_COV_vax=quote(0),
   dH_A_COV_vax=quote(0),
   dE_A_COV=quote(((beta_COV*
@@ -258,7 +392,17 @@ flist=c(
                         cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                         cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                         cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * 
-                    (1-vaccA_COV))*S_A), 
+                    (1-vaccA_COV))*S_A + 
+                   ((beta_COV*
+                       (cAC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccA_COV))*R_A_RSV +
+                   ((beta_COV*
+                       (cAC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cAOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cAA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cAS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccA_COV))*R_A_FLU), 
   dI_A_COV=quote(0),
   dH_A_COV=quote(0),
   dE_S_COV_vax=quote((beta_COV*
@@ -266,7 +410,17 @@ flist=c(
                            cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                            cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                            cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) *
-                        vaccS_COV * ve_COV)*S_S),
+                        vaccS_COV * ve_COV)*S_S +
+                       (beta_COV*
+                          (cSC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccS_COV * ve_COV)*R_S_RSV +
+                       (beta_COV*
+                          (cSC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                             cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                             cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                             cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS) * vaccS_COV * ve_COV)*R_S_FLU),
   dI_S_COV_vax=quote(0),
   dH_S_COV_vax=quote(0),
   dE_S_COV=quote(((beta_COV*
@@ -274,7 +428,17 @@ flist=c(
                         cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
                         cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
                         cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * 
-                    (1-vaccS_COV))*S_S), 
+                    (1-vaccS_COV))*S_S + 
+                   ((beta_COV*
+                       (cSC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccS_COV))*R_S_RSV +
+                   ((beta_COV*
+                       (cSC*(I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax)/popC + 
+                          cSOC*(I_OC_COV + si_COV*I_OC_COV_vax + H_OC_COV + si_COV*H_OC_COV_vax)/popOC + 
+                          cSA*(I_A_COV + si_COV*I_A_COV_vax + H_A_COV + si_COV*H_A_COV_vax)/popA + 
+                          cSS*(I_S_COV + si_COV*I_S_COV_vax + H_S_COV + si_COV*H_S_COV_vax)/popS)) * (1-vaccS_COV))*R_S_FLU), 
   dI_S_COV=quote(0),
   dH_S_COV=quote(0))
 
@@ -328,14 +492,14 @@ for (i in 1:24){
 }
 
 
-para = list( beta_COV=10*(0.189)/5, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
-              alphaC_COV = 0.0015, alphaOC_COV = 0.0015, alphaA_COV = 0.0015, alphaS_COV = 0.025,
-              probHC_COV = 0.01, probHC_COV_vax = .3*0.01, # source of reduction rate is CDC 
-              probHOC_COV = 0.01, probHOC_COV_vax = .3*0.01,
-              probHA_COV = 0.035, probHA_COV_vax = .5*0.035,
-              probHS_COV = 0.2, probHS_COV_vax = .5*0.2,
+para = list( beta_COV=10*(0.27/5), epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+              alphaC_COV = 0.008084800574919152, alphaOC_COV = 0.008084800574919152, alphaA_COV = 0.09281291984653527, alphaS_COV = 0.27612645839610195,
+              probHC_COV = 6.122813945959567e-4, probHC_COV_vax = .3*6.122813945959567e-4, # source of reduction rate is CDC 
+              probHOC_COV = 6.122813945959567e-4, probHOC_COV_vax = .3*6.122813945959567e-4,
+              probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
+              probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
               ss_COV = 0.5, si_COV = 0.5,
-              vaccC_COV = 0, vaccOC_COV = 0, vaccA_COV = 0, vaccS_COV = 0,
+              vaccC_COV = 0.0, vaccOC_COV = 0.0, vaccA_COV = 0.0, vaccS_COV = 0.0,
               ve_COV = .94,
              popC = Pop_children, popOC = Pop_older_children, popA = Pop_adult, popS = Pop_senior
 )
@@ -348,7 +512,9 @@ df = list(S_C = Pop_children, S_OC = Pop_older_children, S_A = Pop_adult, S_S = 
           E_A_COV_vax=0, I_A_COV_vax=0, H_A_COV_vax=0, 
           E_A_COV=0, I_A_COV=0, H_A_COV=0, 
           E_S_COV_vax=0, I_S_COV_vax=0, H_S_COV_vax=0, 
-          E_S_COV=0, I_S_COV=0, H_S_COV=0
+          E_S_COV=0, I_S_COV=0, H_S_COV=0,
+          R_C_RSV=0, R_OC_RSV=0, R_A_RSV=0, R_S_RSV=0,
+          R_C_FLU=0, R_OC_FLU=0, R_A_FLU=0, R_S_FLU=0
 )
 
 nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
@@ -357,9 +523,9 @@ nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
 
 beta_seq <- seq(0.01,0.2,0.001)
 
-R0_grid <- NULL
+COVR0_grid <- NULL
 
-# COV target RO = 2.0
+# COV target RO = 3.0
 # https://pubmed.ncbi.nlm.nih.gov/27716828/
 
 for (i in seq_along(beta_seq)){
@@ -368,11 +534,11 @@ for (i in seq_along(beta_seq)){
   
   R0 <- nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
   
-  R0_grid <- R0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
+  COVR0_grid <- COVR0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
   
 }
 
-## beta = 0.183
+## beta = 0.031
 ```
 
 # FLU
@@ -394,6 +560,8 @@ istates=c("E_C_FLU_vax", "I_C_FLU_vax", "H_C_FLU_vax",
           "E_S_FLU_vax", "I_S_FLU_vax", "H_S_FLU_vax", 
           "E_S_FLU", "I_S_FLU", "H_S_FLU")
 
+#set up each lambda as quote
+
 ## a list that contains equations (as quotes) for completely new infections entering each infected compartment for each class
 flist=c(
   dE_C_FLU_vax=quote((beta_FLU*
@@ -401,7 +569,17 @@ flist=c(
                            cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                            cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                            cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) *
-                        vaccC_FLU * ve_FLU)*S_C),
+                        vaccC_FLU * ve_FLU)*S_C +
+                       (beta_FLU*
+                          (cCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccC_FLU * ve_FLU)*R_C_RSV +
+                       (beta_FLU*
+                          (cCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccC_FLU * ve_FLU)*R_C_COV ), # (lambda * vacc * VE)*S + (lambda * vacc * VE)*R_FLU + (lambda * vacc * VE)*R_FLU
   dI_C_FLU_vax=quote(0),
   dH_C_FLU_vax=quote(0),
   dE_C_FLU=quote(((beta_FLU*
@@ -409,7 +587,17 @@ flist=c(
                         cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                         cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                         cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * 
-                    (1-vaccC_FLU))*S_C), 
+                    (1-vaccC_FLU))*S_C + 
+                   ((beta_FLU*
+                       (cCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccC_FLU))*R_C_RSV +
+                   ((beta_FLU*
+                       (cCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccC_FLU))*R_C_COV ), 
   dI_C_FLU=quote(0),
   dH_C_FLU=quote(0),
   dE_OC_FLU_vax=quote((beta_FLU*
@@ -417,7 +605,17 @@ flist=c(
                             cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                             cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                             cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) *
-                         vaccOC_FLU * ve_FLU)*S_OC),
+                         vaccOC_FLU * ve_FLU)*S_OC +
+                        (beta_FLU*
+                           (cOCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                              cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                              cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                              cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccOC_FLU * ve_FLU)*R_OC_RSV +
+                        (beta_FLU*
+                           (cOCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                              cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                              cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                              cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccOC_FLU * ve_FLU)*R_OC_COV),
   dI_OC_FLU_vax=quote(0),
   dH_OC_FLU_vax=quote(0),
   dE_OC_FLU=quote(((beta_FLU*
@@ -425,7 +623,17 @@ flist=c(
                          cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                          cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                          cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * 
-                     (1-vaccOC_FLU))*S_OC), 
+                     (1-vaccOC_FLU))*S_OC + 
+                    ((beta_FLU*
+                        (cOCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                           cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                           cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                           cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccOC_FLU))*R_OC_RSV +
+                    ((beta_FLU*
+                        (cOCC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                           cOCOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                           cOCA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                           cOCS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccOC_FLU))*R_OC_COV ), 
   dI_OC_FLU=quote(0),
   dH_OC_FLU=quote(0),
   dE_A_FLU_vax=quote((beta_FLU*
@@ -433,7 +641,17 @@ flist=c(
                            cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                            cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                            cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) *
-                        vaccA_FLU * ve_FLU)*S_A),
+                        vaccA_FLU * ve_FLU)*S_A +
+                       (beta_FLU*
+                          (cAC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccA_FLU * ve_FLU)*R_A_RSV +
+                       (beta_FLU*
+                          (cAC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccA_FLU * ve_FLU)*R_A_COV),
   dI_A_FLU_vax=quote(0),
   dH_A_FLU_vax=quote(0),
   dE_A_FLU=quote(((beta_FLU*
@@ -441,7 +659,17 @@ flist=c(
                         cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                         cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                         cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * 
-                    (1-vaccA_FLU))*S_A), 
+                    (1-vaccA_FLU))*S_A + 
+                   ((beta_FLU*
+                       (cAC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccA_FLU))*R_A_RSV +
+                   ((beta_FLU*
+                       (cAC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cAOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cAA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cAS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccA_FLU))*R_A_COV), 
   dI_A_FLU=quote(0),
   dH_A_FLU=quote(0),
   dE_S_FLU_vax=quote((beta_FLU*
@@ -449,7 +677,17 @@ flist=c(
                            cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                            cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                            cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) *
-                        vaccS_FLU * ve_FLU)*S_S),
+                        vaccS_FLU * ve_FLU)*S_S +
+                       (beta_FLU*
+                          (cSC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccS_FLU * ve_FLU)*R_S_RSV +
+                       (beta_FLU*
+                          (cSC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                             cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                             cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                             cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS) * vaccS_FLU * ve_FLU)*R_S_COV),
   dI_S_FLU_vax=quote(0),
   dH_S_FLU_vax=quote(0),
   dE_S_FLU=quote(((beta_FLU*
@@ -457,7 +695,17 @@ flist=c(
                         cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
                         cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
                         cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * 
-                    (1-vaccS_FLU))*S_S), 
+                    (1-vaccS_FLU))*S_S + 
+                   ((beta_FLU*
+                       (cSC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccS_FLU))*R_S_RSV +
+                   ((beta_FLU*
+                       (cSC*(I_C_FLU + si_FLU*I_C_FLU_vax + H_C_FLU + si_FLU*H_C_FLU_vax)/popC + 
+                          cSOC*(I_OC_FLU + si_FLU*I_OC_FLU_vax + H_OC_FLU + si_FLU*H_OC_FLU_vax)/popOC + 
+                          cSA*(I_A_FLU + si_FLU*I_A_FLU_vax + H_A_FLU + si_FLU*H_A_FLU_vax)/popA + 
+                          cSS*(I_S_FLU + si_FLU*I_S_FLU_vax + H_S_FLU + si_FLU*H_S_FLU_vax)/popS)) * (1-vaccS_FLU))*R_S_COV), 
   dI_S_FLU=quote(0),
   dH_S_FLU=quote(0))
 
@@ -511,14 +759,14 @@ for (i in 1:24){
 }
 
 
-para = list( beta_FLU=10*((0.257 + 0.305)/2)/7, epsilon_FLU = 1/3, omega_FLU = 1/(15*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
-              alphaC_FLU = 0.00001, alphaOC_FLU = 0.00001, alphaA_FLU = 0.00005, alphaS_FLU = 0.001,
-              probHC_FLU = 0.00013, probHC_FLU_vax = .5*0.00013, # source of reduction rate is CDC 
-              probHOC_FLU = 0.00013, probHOC_FLU_vax = .5*0.00013,
-              probHA_FLU = 0.00017, probHA_FLU_vax = 56*0.00017,
-              probHS_FLU = 0.0012, probHS_FLU_vax = .58*0.0012,
+para = list( beta_FLU=10*(0.27/5), epsilon_FLU = 1/3, omega_FLU = 1/(3*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+              alphaC_FLU = 0.02066115702479339, alphaOC_FLU = 0.02066115702479339, alphaA_FLU = 0.06416913946587537, alphaS_FLU = 0.12145254806225206,
+              probHC_FLU = 5.370400336733193e-4, probHC_FLU_vax = .5*5.370400336733193e-4, # source of reduction rate is CDC 
+              probHOC_FLU = 5.370400336733193e-4, probHOC_FLU_vax = .5*5.370400336733193e-4,
+              probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
+              probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
               ss_FLU = 0.5, si_FLU = 0.5,
-              vaccC_FLU = 0, vaccOC_FLU = 0, vaccA_FLU = 0, vaccS_FLU = 0,
+              vaccC_FLU = 0.0, vaccOC_FLU = 0.0, vaccA_FLU = 0.0, vaccS_FLU = 0.0,
               ve_FLU = 0.9,
              popC = Pop_children, popOC = Pop_older_children, popA = Pop_adult, popS = Pop_senior
 )
@@ -531,7 +779,9 @@ df = list(S_C = Pop_children, S_OC = Pop_older_children, S_A = Pop_adult, S_S = 
           E_A_FLU_vax=0, I_A_FLU_vax=0, H_A_FLU_vax=0, 
           E_A_FLU=0, I_A_FLU=0, H_A_FLU=0, 
           E_S_FLU_vax=0, I_S_FLU_vax=0, H_S_FLU_vax=0, 
-          E_S_FLU=0, I_S_FLU=0, H_S_FLU=0
+          E_S_FLU=0, I_S_FLU=0, H_S_FLU=0,
+          R_C_RSV=0, R_OC_RSV=0, R_A_RSV=0, R_S_RSV=0,
+          R_C_COV=0, R_OC_COV=0, R_A_COV=0, R_S_COV=0
 )
 
 nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
@@ -540,9 +790,10 @@ nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
 
 beta_seq <- seq(0.01,0.2,0.001)
 
-R0_grid <- NULL
+FLUR0_grid <- NULL
 
-# FLU target RO = 1.28
+# FLU target RO = 3.0
+# https://pubmed.ncbi.nlm.nih.gov/27716828/
 
 for (i in seq_along(beta_seq)){
   
@@ -550,9 +801,9 @@ for (i in seq_along(beta_seq)){
   
   R0 <- nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
   
-  R0_grid <- R0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
+  FLUR0_grid <- FLUR0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
   
 }
 
-## beta = 0.183
+## beta = 0.031
 ```

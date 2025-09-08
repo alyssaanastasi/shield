@@ -4,8 +4,8 @@ library(socialmixr)
 
 #### General parameters ####
 
-times <- 1:500
-PopT <- 1.2*10^7 ## 20 million total
+times <- 1:5000
+PopT <- 1.2*10^7 ## 12 million total (Illinois )
 
 
 Pop_children <- PopT/4
@@ -42,31 +42,40 @@ cSS <- S_vals[4]
 
 names_var <- c("S_C", "S_OC", "S_A", "S_S",
                 "E_C_RSV_vax", "I_C_RSV_vax", "H_C_RSV_vax", "D_C_RSV_vax",
-                "E_C_RSV", "I_C_RSV", "H_C_RSV", "D_C_RSV",
+                "E_C_RSV", "I_C_RSV", "H_C_RSV", "D_C_RSV", "R_C_RSV",
+               
                 "E_OC_RSV_vax", "I_OC_RSV_vax", "H_OC_RSV_vax", "D_OC_RSV_vax",
-                "E_OC_RSV", "I_OC_RSV", "H_OC_RSV", "D_OC_RSV",
+                "E_OC_RSV", "I_OC_RSV", "H_OC_RSV", "D_OC_RSV", "R_OC_RSV",
+               
                 "E_A_RSV_vax", "I_A_RSV_vax", "H_A_RSV_vax", "D_A_RSV_vax",
-                "E_A_RSV", "I_A_RSV", "H_A_RSV", "D_A_RSV",
+                "E_A_RSV", "I_A_RSV", "H_A_RSV", "D_A_RSV", "R_A_RSV",
+               
                 "E_S_RSV_vax", "I_S_RSV_vax", "H_S_RSV_vax", "D_S_RSV_vax",
-                "E_S_RSV", "I_S_RSV", "H_S_RSV", "D_S_RSV", 
+                "E_S_RSV", "I_S_RSV", "H_S_RSV", "D_S_RSV", "R_S_RSV",
                
                  "E_C_COV_vax", "I_C_COV_vax", "H_C_COV_vax", "D_C_COV_vax",
-                 "E_C_COV", "I_C_COV", "H_C_COV", "D_C_COV",
-                 "E_OC_COV_vax", "I_OC_COV_vax", "H_OC_COV_vax", "D_OC_COV_vax",
-                 "E_OC_COV", "I_OC_COV", "H_OC_COV", "D_OC_COV",
-                 "E_A_COV_vax", "I_A_COV_vax", "H_A_COV_vax", "D_A_COV_vax",
-                 "E_A_COV", "I_A_COV", "H_A_COV", "D_A_COV",
-                 "E_S_COV_vax", "I_S_COV_vax", "H_S_COV_vax", "D_S_COV_vax",
-                 "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV",
+                 "E_C_COV", "I_C_COV", "H_C_COV", "D_C_COV", "R_C_COV",
                
-               "E_C_FLU_vax", "I_C_FLU_vax", "H_C_FLU_vax", "D_C_FLU_vax",
-               "E_C_FLU", "I_C_FLU", "H_C_FLU", "D_C_FLU",
-               "E_OC_FLU_vax", "I_OC_FLU_vax", "H_OC_FLU_vax", "D_OC_FLU_vax",
-               "E_OC_FLU", "I_OC_FLU", "H_OC_FLU", "D_OC_FLU",
-               "E_A_FLU_vax", "I_A_FLU_vax", "H_A_FLU_vax", "D_A_FLU_vax",
-               "E_A_FLU", "I_A_FLU", "H_A_FLU", "D_A_FLU",
-               "E_S_FLU_vax", "I_S_FLU_vax", "H_S_FLU_vax", "D_S_FLU_vax",
-               "E_S_FLU", "I_S_FLU", "H_S_FLU", "D_S_FLU"
+                 "E_OC_COV_vax", "I_OC_COV_vax", "H_OC_COV_vax", "D_OC_COV_vax",
+                 "E_OC_COV", "I_OC_COV", "H_OC_COV", "D_OC_COV", "R_OC_COV",
+               
+                 "E_A_COV_vax", "I_A_COV_vax", "H_A_COV_vax", "D_A_COV_vax",
+                 "E_A_COV", "I_A_COV", "H_A_COV", "D_A_COV", "R_A_COV",
+               
+                 "E_S_COV_vax", "I_S_COV_vax", "H_S_COV_vax", "D_S_COV_vax",
+                 "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV", "R_S_COV",
+               
+                 "E_C_FLU_vax", "I_C_FLU_vax", "H_C_FLU_vax", "D_C_FLU_vax",
+                 "E_C_FLU", "I_C_FLU", "H_C_FLU", "D_C_FLU", "R_C_FLU",
+               
+                 "E_OC_FLU_vax", "I_OC_FLU_vax", "H_OC_FLU_vax", "D_OC_FLU_vax",
+                 "E_OC_FLU", "I_OC_FLU", "H_OC_FLU", "D_OC_FLU", "R_OC_FLU",
+               
+                 "E_A_FLU_vax", "I_A_FLU_vax", "H_A_FLU_vax", "D_A_FLU_vax",
+                 "E_A_FLU", "I_A_FLU", "H_A_FLU", "D_A_FLU", "R_A_FLU",
+               
+                 "E_S_FLU_vax", "I_S_FLU_vax", "H_S_FLU_vax", "D_S_FLU_vax",
+                 "E_S_FLU", "I_S_FLU", "H_S_FLU", "D_S_FLU", "R_S_FLU"
                 )
 
 
@@ -109,7 +118,7 @@ total_pop <- c(
   "Children" = Pop_children
 )
 
-parms <- c( # 10*(0.27/5)
+novac_parms <- c(   #R0 - 3
                beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
                alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
                probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
@@ -117,111 +126,126 @@ parms <- c( # 10*(0.27/5)
                probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
                probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
                ss_RSV = 0.5, si_RSV = 0.5,
-               vaccC_RSV = 0.3, vaccOC_RSV = 0.3, vaccA_RSV = 0.3, vaccS_RSV = 0.3,
+               vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
                ve_RSV = .81,
             
-              # 10*(0.189)/5
-              beta_COV=0.032, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
-              alphaC_COV = 0.0015, alphaOC_COV = 0.0015, alphaA_COV = 0.0015, alphaS_COV = 0.025,
-              probHC_COV = 0.01, probHC_COV_vax = .3*0.01, # source of reduction rate is CDC 
-              probHOC_COV = 0.01, probHOC_COV_vax = .3*0.01,
-              probHA_COV = 0.035, probHA_COV_vax = .5*0.035,
-              probHS_COV = 0.2, probHS_COV_vax = .5*0.2,
+              # R0 - 3.82
+              beta_COV=0.063, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+              alphaC_COV = 0.008084800574919152, alphaOC_COV = 0.008084800574919152, alphaA_COV = 0.09281291984653527, alphaS_COV = 0.27612645839610195,
+              probHC_COV = 6.122813945959567e-4, probHC_COV_vax = .3*6.122813945959567e-4, # source of reduction rate is CDC 
+              probHOC_COV = 6.122813945959567e-4, probHOC_COV_vax = .3*6.122813945959567e-4,
+              probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
+              probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
               ss_COV = 0.5, si_COV = 0.5,
-              vaccC_COV = 0.3, vaccOC_COV = 0.3, vaccA_COV = 0.3, vaccS_COV = 0.3,
+              vaccC_COV = 0.0, vaccOC_COV = 0.0, vaccA_COV = 0.0, vaccS_COV = 0.0,
               ve_COV = .94,
             
-              #10*((0.257 + 0.305)/2)/7
-              beta_FLU=0.015, epsilon_FLU = 1/3, omega_FLU = 1/(15*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
-              alphaC_FLU = 0.00001, alphaOC_FLU = 0.00001, alphaA_FLU = 0.00005, alphaS_FLU = 0.001,
-              probHC_FLU = 0.00013, probHC_FLU_vax = .5*0.00013, # source of reduction rate is CDC 
-              probHOC_FLU = 0.00013, probHOC_FLU_vax = .5*0.00013,
-              probHA_FLU = 0.00017, probHA_FLU_vax = 56*0.00017,
-              probHS_FLU = 0.0012, probHS_FLU_vax = .58*0.0012,
+              # R0 - 3
+              beta_FLU=0.036, epsilon_FLU = 1/3, omega_FLU = 1/(3*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+              alphaC_FLU = 0.02066115702479339, alphaOC_FLU = 0.02066115702479339, alphaA_FLU = 0.06416913946587537, alphaS_FLU = 0.12145254806225206,
+              probHC_FLU = 5.370400336733193e-4, probHC_FLU_vax = .5*5.370400336733193e-4, # source of reduction rate is CDC 
+              probHOC_FLU = 5.370400336733193e-4, probHOC_FLU_vax = .5*5.370400336733193e-4,
+              probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
+              probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
               ss_FLU = 0.5, si_FLU = 0.5,
-              vaccC_FLU = 0.3, vaccOC_FLU = 0.3, vaccA_FLU = 0.3, vaccS_FLU = 0.3,
+              vaccC_FLU = 0.0, vaccOC_FLU = 0.0, vaccA_FLU = 0.0, vaccS_FLU = 0.0,
               ve_FLU = 0.9)
 
+currvac_parms <- c(   #R0 - 3
+              beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
+              alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
+              probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
+              probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
+              probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
+              probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
+              ss_RSV = 0.5, si_RSV = 0.5,
+              vaccC_RSV = 0.29, vaccOC_RSV = .222, vaccA_RSV = .222, vaccS_RSV = .222,
+              ve_RSV = .81,
+              
+              # R0 - 3.82
+              beta_COV=0.063, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+              alphaC_COV = 0.008084800574919152, alphaOC_COV = 0.008084800574919152, alphaA_COV = 0.09281291984653527, alphaS_COV = 0.27612645839610195,
+              probHC_COV = 6.122813945959567e-4, probHC_COV_vax = .3*6.122813945959567e-4, # source of reduction rate is CDC 
+              probHOC_COV = 6.122813945959567e-4, probHOC_COV_vax = .3*6.122813945959567e-4,
+              probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
+              probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
+              ss_COV = 0.5, si_COV = 0.5,
+              vaccC_COV = 0.061, vaccOC_COV = 0.051, vaccA_COV = 0.07, vaccS_COV = 0.292,
+              ve_COV = .94,
+              
+              # R0 - 3
+              beta_FLU=0.036, epsilon_FLU = 1/3, omega_FLU = 1/(3*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+              alphaC_FLU = 0.02066115702479339, alphaOC_FLU = 0.02066115702479339, alphaA_FLU = 0.06416913946587537, alphaS_FLU = 0.12145254806225206,
+              probHC_FLU = 5.370400336733193e-4, probHC_FLU_vax = .5*5.370400336733193e-4, # source of reduction rate is CDC 
+              probHOC_FLU = 5.370400336733193e-4, probHOC_FLU_vax = .5*5.370400336733193e-4,
+              probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
+              probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
+              ss_FLU = 0.5, si_FLU = 0.5,
+              vaccC_FLU = 0.364, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.58,
+              ve_FLU = 0.9)
 
-# RSV
+seniorvac_parms <- c(   #R0 - 3
+  beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
+  alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
+  probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
+  probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
+  probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
+  probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
+  ss_RSV = 0.5, si_RSV = 0.5,
+  vaccC_RSV = 0.29, vaccOC_RSV = .222, vaccA_RSV = .222, vaccS_RSV = .322,
+  ve_RSV = .81,
+  
+  # R0 - 3.82
+  beta_COV=0.063, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+  alphaC_COV = 0.008084800574919152, alphaOC_COV = 0.008084800574919152, alphaA_COV = 0.09281291984653527, alphaS_COV = 0.27612645839610195,
+  probHC_COV = 6.122813945959567e-4, probHC_COV_vax = .3*6.122813945959567e-4, # source of reduction rate is CDC 
+  probHOC_COV = 6.122813945959567e-4, probHOC_COV_vax = .3*6.122813945959567e-4,
+  probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
+  probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
+  ss_COV = 0.5, si_COV = 0.5,
+  vaccC_COV = 0.061, vaccOC_COV = 0.051, vaccA_COV = 0.07, vaccS_COV = 0.392,
+  ve_COV = .94,
+  
+  # R0 - 3
+  beta_FLU=0.036, epsilon_FLU = 1/3, omega_FLU = 1/(3*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+  alphaC_FLU = 0.02066115702479339, alphaOC_FLU = 0.02066115702479339, alphaA_FLU = 0.06416913946587537, alphaS_FLU = 0.12145254806225206,
+  probHC_FLU = 5.370400336733193e-4, probHC_FLU_vax = .5*5.370400336733193e-4, # source of reduction rate is CDC 
+  probHOC_FLU = 5.370400336733193e-4, probHOC_FLU_vax = .5*5.370400336733193e-4,
+  probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
+  probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
+  ss_FLU = 0.5, si_FLU = 0.5,
+  vaccC_FLU = 0.364, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.68,
+  ve_FLU = 0.9)
 
-rsv_names_var <- c("S_C", "S_OC", "S_A", "S_S",
-                    "E_C_RSV_vax", "I_C_RSV_vax", "H_C_RSV_vax", "D_C_RSV_vax",
-                    "E_C_RSV", "I_C_RSV", "H_C_RSV", "D_C_RSV",
-                    "E_OC_RSV_vax", "I_OC_RSV_vax", "H_OC_RSV_vax", "D_OC_RSV_vax",
-                    "E_OC_RSV", "I_OC_RSV", "H_OC_RSV", "D_OC_RSV",
-                    "E_A_RSV_vax", "I_A_RSV_vax", "H_A_RSV_vax", "D_A_RSV_vax",
-                    "E_A_RSV", "I_A_RSV", "H_A_RSV", "D_A_RSV",
-                    "E_S_RSV_vax", "I_S_RSV_vax", "H_S_RSV_vax", "D_S_RSV_vax",
-                    "E_S_RSV", "I_S_RSV", "H_S_RSV", "D_S_RSV")
-
-init_rsv <- rep(0,length(rsv_names_var))
-names(init_rsv) <- rsv_names_var
-init_rsv["S_C"] <- Pop_children - 2
-init_rsv["I_C_RSV_vax"] <- 1
-init_rsv["I_C_RSV"] <- 1
-init_rsv["S_OC"] <- Pop_older_children - 2
-init_rsv["I_OC_RSV_vax"] <- 1
-init_rsv["I_OC_RSV"] <- 1
-init_rsv["S_A"] <- Pop_adult - 2
-init_rsv["I_A_RSV_vax"] <- 1
-init_rsv["I_A_RSV"] <- 1
-init_rsv["S_S"] <- Pop_senior - 2
-init_rsv["I_S_RSV_vax"] <- 2
-init_rsv["I_S_RSV"] <- 2
-
-rsv_parms <- c(cCC = 2.1, cCOC = 2, cCA = 2, cCS = 0.2, 
-               cOCOC = 2.1, cOCA = 2, cOCS = 0.2, 
-               cAA = 3, cAS = 0.5, cSS = 1,
-               
-               beta_RSV=10*(0.27/5), epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/5, gammaH_RSV = 1/15, #gammaH placeholder    
-               alphaC_RSV = 0.0015, alphaOC_RSV = 0.0015, alphaA_RSV = 0.005, alphaS_RSV = 0.025,
-               probHC_RSV = 0.00013, probHC_RSV_vax = .5*0.01, # source of reduction rate is CDC 
-               probHOC_RSV = 0.00013, probHOC_RSV_vax = .5*0.01,
-               probHA_RSV = 0.00017, probHA_RSV_vax = .56*0.035,
-               probHS_RSV = 0.0012, probHS_RSV_vax = .58*0.2,
-               ss_RSV = 0.5, si_RSV = 0.5,
-               vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
-               ve_RSV = .88)
-
-# COV
-
-COV_names_var <- c("S_C", "S_OC", "S_A", "S_S",
-                   "E_C_COV_vax", "I_C_COV_vax", "H_C_COV_vax", "D_C_COV_vax",
-                   "E_C_COV", "I_C_COV", "H_C_COV", "D_C_COV",
-                   "E_OC_COV_vax", "I_OC_COV_vax", "H_OC_COV_vax", "D_OC_COV_vax",
-                   "E_OC_COV", "I_OC_COV", "H_OC_COV", "D_OC_COV",
-                   "E_A_COV_vax", "I_A_COV_vax", "H_A_COV_vax", "D_A_COV_vax",
-                   "E_A_COV", "I_A_COV", "H_A_COV", "D_A_COV",
-                   "E_S_COV_vax", "I_S_COV_vax", "H_S_COV_vax", "D_S_COV_vax",
-                   "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV")
-
-init_COV <- rep(0,length(COV_names_var))
-names(init_COV) <- COV_names_var
-init_COV["S_C"] <- Pop_children - 2
-init_COV["I_C_COV_vax"] <- 1
-init_COV["I_C_COV"] <- 1
-init_COV["S_OC"] <- Pop_older_children - 2
-init_COV["I_OC_COV_vax"] <- 1
-init_COV["I_OC_COV"] <- 1
-init_COV["S_A"] <- Pop_adult - 2
-init_COV["I_A_COV_vax"] <- 1
-init_COV["I_A_COV"] <- 1
-init_COV["S_S"] <- Pop_senior - 2
-init_COV["I_S_COV_vax"] <- 2
-init_COV["I_S_COV"] <- 2
-
-COV_parms <- c(cCC = 2.1, cCOC = 2, cCA = 2, cCS = 0.2, 
-               cOCOC = 2.1, cOCA = 2, cOCS = 0.2, 
-               cAA = 3, cAS = 0.5, cSS = 1,
-               
-               beta_COV=10*(0.189)/5, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
-               alphaC_COV = 0.0015, alphaOC_COV = 0.0015, alphaA_COV = 0.0015, alphaS_COV = 0.025,
-               probHC_COV = 0.01, probHC_COV_vax = .3*0.01, # source of reduction rate is CDC 
-               probHOC_COV = 0.01, probHOC_COV_vax = .3*0.01,
-               probHA_COV = 0.035, probHA_COV_vax = .5*0.035,
-               probHS_COV = 0.2, probHS_COV_vax = .5*0.2,
-               ss_COV = 0.5, si_COV = 0.5,
-               vaccC_COV = 0.3, vaccOC_COV = 0.3, vaccA_COV = 0.3, vaccS_COV = 0.3,
-               ve_COV = .94)
-
+childrenvac_parms <- c(   #R0 - 3
+  beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
+  alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
+  probHC_RSV = 0.08, probHC_RSV_vax = .5*0.08, # source of reduction rate is CDC 
+  probHOC_RSV = 0.0013, probHOC_RSV_vax = .5*0.0013,
+  probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
+  probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
+  ss_RSV = 0.5, si_RSV = 0.5,
+  vaccC_RSV = 0.39, vaccOC_RSV = .222, vaccA_RSV = .222, vaccS_RSV = .222,
+  ve_RSV = .81,
+  
+  # R0 - 3.82
+  beta_COV=0.063, epsilon_COV = 1/3, omega_COV = 1/(6*30), gammaI_COV = 1/5, gammaH_COV = 1/15, 
+  alphaC_COV = 0.008084800574919152, alphaOC_COV = 0.008084800574919152, alphaA_COV = 0.09281291984653527, alphaS_COV = 0.27612645839610195,
+  probHC_COV = 6.122813945959567e-4, probHC_COV_vax = .3*6.122813945959567e-4, # source of reduction rate is CDC 
+  probHOC_COV = 6.122813945959567e-4, probHOC_COV_vax = .3*6.122813945959567e-4,
+  probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
+  probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
+  ss_COV = 0.5, si_COV = 0.5,
+  vaccC_COV = 0.161, vaccOC_COV = 0.051, vaccA_COV = 0.07, vaccS_COV = 0.292,
+  ve_COV = .94,
+  
+  # R0 - 3
+  beta_FLU=0.036, epsilon_FLU = 1/3, omega_FLU = 1/(3*30), gammaI_FLU = 1/7, gammaH_FLU = 1/11,  
+  alphaC_FLU = 0.02066115702479339, alphaOC_FLU = 0.02066115702479339, alphaA_FLU = 0.06416913946587537, alphaS_FLU = 0.12145254806225206,
+  probHC_FLU = 5.370400336733193e-4, probHC_FLU_vax = .5*5.370400336733193e-4, # source of reduction rate is CDC 
+  probHOC_FLU = 5.370400336733193e-4, probHOC_FLU_vax = .5*5.370400336733193e-4,
+  probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
+  probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
+  ss_FLU = 0.5, si_FLU = 0.5,
+  vaccC_FLU = 0.464, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.58,
+  ve_FLU = 0.9)

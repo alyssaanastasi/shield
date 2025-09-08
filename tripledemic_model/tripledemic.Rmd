@@ -20,67 +20,21 @@ library(spatstat.utils)
 library(paletteer)
 library(bbmle)
 library(mgcv)
-source("seir.R")
 source("seir_params.R")
-source("seir_RSV.R")
-source("seir_COV.R")
+source("seir_rev.R")
 ```
 
-## Test Indiv. Models
+# Tripledemic Scenario
+
+## No Vaccination
 ```{R}
-df_RSV <- ode(y=init_rsv, func = seir_RSV, times=times, parms = rsv_parms) %>%
+df_novac <- ode(y=init, func = seir_rev, times=times, parms = novac_parms) %>%
   as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
      mutate(age_group = case_when(
-      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
-      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
-      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
-      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
-    mutate(type = case_when(
-        grepl("^S_", name) ~ "Susceptible",
-        grepl("E_", name) ~ "Exposed",
-        grepl("I_", name) ~ "Infected",
-        grepl("H_", name) ~ "Hospitalized",
-        grepl("D_", name) ~ "Dead"))
-```
-
-```{R}
-df_RSV %>% filter(type == "Infected") %>% 
-  ggplot(aes(x=time,y=value, color=name)) + 
-  geom_line() + 
-  facet_wrap(~ age_group)
-```
-
-```{R}
-df_COV <- ode(y=init_COV, func = seir_COV, times=times, parms = COV_parms) %>%
-  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
-     mutate(age_group = case_when(
-      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
-      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
-      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
-      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
-    mutate(type = case_when(
-        grepl("^S_", name) ~ "Susceptible",
-        grepl("E_", name) ~ "Exposed",
-        grepl("I_", name) ~ "Infected",
-        grepl("H_", name) ~ "Hospitalized",
-        grepl("D_", name) ~ "Dead"))
-```
-
-```{R}
-df_COV %>% filter(type == "Infected") %>% 
-  ggplot(aes(x=time,y=value, color=name)) + 
-  geom_line() + 
-  facet_wrap(~ age_group)
-```
-
-```{R}
-df <- ode(y=init, func = seir, times=times, parms = parms) %>%
-  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
-     mutate(age_group = case_when(
-      grepl("^S_C|^E_C|^I_C|^H_C|^D_C", name) ~ "Children",
-      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^D_OC", name) ~ "Older Children",
-      grepl("^S_A|^E_A|^I_A|^H_A|^D_A", name) ~ "Adults",
-      grepl("^S_S|^E_S|^I_S|^H_S|^D_S", name) ~ "Seniors")) %>%
+      grepl("^S_C|^E_C|^I_C|^H_C|^R_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^R_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^R_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^R_S|^D_S", name) ~ "Seniors")) %>%
     mutate(disease_group = case_when(
       grepl("RSV", name) ~ "RSV",
       grepl("COV", name) ~ "COVID",
@@ -90,26 +44,139 @@ df <- ode(y=init, func = seir, times=times, parms = parms) %>%
       grepl("E_", name) ~ "Exposed",
       grepl("I_", name) ~ "Infected",
       grepl("H_", name) ~ "Hospitalized",
-      grepl("D_", name) ~ "Dead"))
+      grepl("R_", name) ~ "Recovered",
+      grepl("D_", name) ~ "Dead")) %>% 
+  mutate(vacc_type = case_when(
+      grepl("_vax", name) ~ "Vaccinated",
+      TRUE ~ "Unvaccinated"
+      ))
 
-  
+# factor age so its in order
+df_novac$age_groupf = factor(df_novac$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
 ```
 
 ```{R}
-plot <- df %>% filter(type == "Infected") %>% 
-  group_by(disease_group, time) %>%
-  summarise(value = sum(value)) %>%
-  ungroup() %>%
-  ggplot(aes(x=time,y=value)) + 
+novac_plot <- df_novac %>% filter(type == "Infected") %>% 
+  filter(vacc_type == "Unvaccinated") %>%
+  filter(time <= 400) %>%
+  ggplot(aes(x=time,y=value, color=vacc_type)) + 
   geom_line() + 
-  facet_wrap(~disease_group, scales = "free")
-plot
+  facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE)
+novac_plot
 ```
 
+## Current Vaccination
+```{R}
+df_currvac <- ode(y=init, func = seir_rev, times=times, parms = currvac_parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^R_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^R_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^R_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^R_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(disease_group = case_when(
+      grepl("RSV", name) ~ "RSV",
+      grepl("COV", name) ~ "COVID",
+      grepl("FLU", name) ~ "FLU")) %>%
+  mutate(type = case_when(
+      grepl("^S_", name) ~ "Susceptible",
+      grepl("E_", name) ~ "Exposed",
+      grepl("I_", name) ~ "Infected",
+      grepl("H_", name) ~ "Hospitalized",
+      grepl("R_", name) ~ "Recovered",
+      grepl("D_", name) ~ "Dead")) %>% 
+  mutate(vacc_type = case_when(
+      grepl("_vax", name) ~ "Vaccinated",
+      TRUE ~ "Unvaccinated"
+      ))
+
+# factor age so its in order
+df_currvac$age_groupf = factor(df_currvac$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
+```
+
+```{r}
+currvac_plot <- df_currvac %>% filter(type == "Infected") %>%
+  filter(time <= 400) %>%
+  ggplot(aes(x=time,y=value, color=vacc_type)) + 
+  geom_line() + 
+  facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE)
+currvac_plot
+```
+
+## Four Scenarios
+
+### Seniors
 
 ```{R}
-df %>% filter(disease_group == "FLU") %>% filter(type == "Infected") %>% 
-  ggplot(aes(x=time,y=value, color=name)) + 
+df_seniorvac <- ode(y=init, func = seir_rev, times=times, parms = seniorvac_parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^R_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^R_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^R_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^R_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(disease_group = case_when(
+      grepl("RSV", name) ~ "RSV",
+      grepl("COV", name) ~ "COVID",
+      grepl("FLU", name) ~ "FLU")) %>%
+  mutate(type = case_when(
+      grepl("^S_", name) ~ "Susceptible",
+      grepl("E_", name) ~ "Exposed",
+      grepl("I_", name) ~ "Infected",
+      grepl("H_", name) ~ "Hospitalized",
+      grepl("R_", name) ~ "Recovered",
+      grepl("D_", name) ~ "Dead")) %>% 
+  mutate(vacc_type = case_when(
+      grepl("_vax", name) ~ "Vaccinated",
+      TRUE ~ "Unvaccinated"
+      ))
+
+# factor age so its in order
+df_seniorvac$age_groupf = factor(df_seniorvac$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
+```
+
+```{r}
+seniorvac_plot <- df_seniorvac %>% filter(type == "Infected") %>%
+  filter(time <= 400) %>%
+  ggplot(aes(x=time,y=value, color=vacc_type)) + 
   geom_line() + 
-  facet_grid(rows = vars(age_group), cols = vars(disease_group), drop = FALSE)
+  facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE)
+seniorvac_plot
+```
+
+```{R}
+df_childrenvac <- ode(y=init, func = seir_rev, times=times, parms = childrenvac_parms) %>%
+  as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
+     mutate(age_group = case_when(
+      grepl("^S_C|^E_C|^I_C|^H_C|^R_C|^D_C", name) ~ "Children",
+      grepl("^S_OC|^E_OC|^I_OC|^H_OC|^R_OC|^D_OC", name) ~ "Older Children",
+      grepl("^S_A|^E_A|^I_A|^H_A|^R_A|^D_A", name) ~ "Adults",
+      grepl("^S_S|^E_S|^I_S|^H_S|^R_S|^D_S", name) ~ "Seniors")) %>%
+    mutate(disease_group = case_when(
+      grepl("RSV", name) ~ "RSV",
+      grepl("COV", name) ~ "COVID",
+      grepl("FLU", name) ~ "FLU")) %>%
+  mutate(type = case_when(
+      grepl("^S_", name) ~ "Susceptible",
+      grepl("E_", name) ~ "Exposed",
+      grepl("I_", name) ~ "Infected",
+      grepl("H_", name) ~ "Hospitalized",
+      grepl("R_", name) ~ "Recovered",
+      grepl("D_", name) ~ "Dead")) %>% 
+  mutate(vacc_type = case_when(
+      grepl("_vax", name) ~ "Vaccinated",
+      TRUE ~ "Unvaccinated"
+      ))
+
+# factor age so its in order
+df_childrenvac$age_groupf = factor(df_childrenvac$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
+```
+
+```{r}
+childrenvac_plot <- df_childrenvac %>% filter(type == "Infected") %>%
+  filter(time <= 400) %>%
+  ggplot(aes(x=time,y=value, color=vacc_type)) + 
+  geom_line() + 
+  facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE)
+childrenvac_plot
 ```

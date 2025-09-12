@@ -4,14 +4,18 @@ library(socialmixr)
 
 #### General parameters ####
 
-times <- 1:5000
-PopT <- 1.2*10^7 ## 12 million total (Illinois )
+times <- 1:400
+PopT <- 12549689 # Census Data for Illinois
 
-
-Pop_children <- PopT/4
-Pop_older_children <- PopT/4 
-Pop_adult <- PopT/4
-Pop_senior <- PopT/4
+# Source: Census broken down by age & gender 
+          # https://censusreporter.org/data/table/?table=B01001&geo_ids=04000US17,01000US&primary_geo_id=04000US17#valueType%7Cestimate
+Pop_children <- sum(333778, 327248) # 0-5 
+Pop_older_children <- sum(388433,399053,257198,
+                          364835,380780,250302) # 6-18
+Pop_adult <- sum(165712,78038,78869,257152,414609,433403,416625,427890,381100,397062,378946,167142, 234843,
+                 154281,75639,74014,253361,408045,426167,415702,418187,383266,393380,384805,164793,259201)  # 18-65
+Pop_senior <- sum(145412, 195979, 270011, 176580,112227,87596,
+                  156716,219275,308211,218144,156707,158972) # 65+
 
 
 #Set contact rates globally
@@ -118,6 +122,9 @@ total_pop <- c(
   "Children" = Pop_children
 )
 
+#Hospital Capacity: https://www.covidcaremap.org/maps/us-healthcare-system-capacity/#3.81/37.58/-96.77
+  # Staffed Beds * (1-All Bed Occupancy Rate)
+
 novac_parms <- c(   #R0 - 3
                beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
                alphaC_RSV = 0.00002, alphaOC_RSV = 0.000009, alphaA_RSV = 0.00011, alphaS_RSV = 0.00046,
@@ -149,7 +156,9 @@ novac_parms <- c(   #R0 - 3
               probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
               ss_FLU = 0.5, si_FLU = 0.5,
               vaccC_FLU = 0.0, vaccOC_FLU = 0.0, vaccA_FLU = 0.0, vaccS_FLU = 0.0,
-              ve_FLU = 0.9)
+              ve_FLU = 0.9,
+              
+              H_cap = 12334	)
 
 currvac_parms <- c(   #R0 - 3
               beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
@@ -170,7 +179,7 @@ currvac_parms <- c(   #R0 - 3
               probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
               probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
               ss_COV = 0.5, si_COV = 0.5,
-              vaccC_COV = 0.061, vaccOC_COV = 0.051, vaccA_COV = 0.07, vaccS_COV = 0.292,
+              vaccC_COV = 0.068, vaccOC_COV = 0.054, vaccA_COV = 0.101, vaccS_COV = 0.303,
               ve_COV = .94,
               
               # R0 - 3
@@ -181,8 +190,10 @@ currvac_parms <- c(   #R0 - 3
               probHA_FLU = 0.0011383064259089782, probHA_FLU_vax = .56*0.0011383064259089782,
               probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
               ss_FLU = 0.5, si_FLU = 0.5,
-              vaccC_FLU = 0.364, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.58,
-              ve_FLU = 0.9)
+              vaccC_FLU = 0.359, vaccOC_FLU = 0.216, vaccA_FLU = 0.23, vaccS_FLU = 0.582,
+              ve_FLU = 0.9,
+              
+              H_cap = 12334)
 
 seniorvac_parms <- c(   #R0 - 3
   beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
@@ -215,7 +226,9 @@ seniorvac_parms <- c(   #R0 - 3
   probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
   ss_FLU = 0.5, si_FLU = 0.5,
   vaccC_FLU = 0.364, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.68,
-  ve_FLU = 0.9)
+  ve_FLU = 0.9,
+  
+  H_cap = 12334)
 
 childrenvac_parms <- c(   #R0 - 3
   beta_RSV=0.031, epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gammaI_RSV = 1/8, gammaH_RSV = 1/15,    
@@ -248,4 +261,6 @@ childrenvac_parms <- c(   #R0 - 3
   probHS_FLU = 0.036483639168077384, probHS_FLU_vax = .58*0.036483639168077384,
   ss_FLU = 0.5, si_FLU = 0.5,
   vaccC_FLU = 0.464, vaccOC_FLU = 0.216, vaccA_FLU = 0.2, vaccS_FLU = 0.58,
-  ve_FLU = 0.9)
+  ve_FLU = 0.9,
+  
+  H_cap = 12334)

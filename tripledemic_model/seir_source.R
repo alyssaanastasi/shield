@@ -83,3 +83,18 @@ get_lambdas <- function(parms, y, cmat){
   }
   return(lambda_vec)
 }
+
+get_H_total <- function(y){
+  list2env(as.list(y), envir = environment())
+  names <-c()
+  for (age in ages){
+    for (disease in diseases){
+      names <- c(names,
+        paste0(c("H"), "_", age, "_", disease, "_vax"),
+        paste0(c("H"), "_", age, "_", disease)
+      )
+    }}
+  all_H <- mget(names, inherits=TRUE)
+  H_total <- sum(unlist(all_H))
+  return(H_total)
+}

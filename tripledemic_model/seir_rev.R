@@ -25,6 +25,14 @@ seir_rev <- function(t, y, pars){
   # Lambda = x to y population contact * mu * prop of y infected
   list2env(as.list(get_lambdas(pars, y, cmat)), envir=environment()) #get_lambdas is function used to compute lambda for each age & disease
   
+  #Check Hospitalization Condition
+  H_capacity_reached <- FALSE
+  # if (get_H_total(y) > H_cap){
+    # H_capacity_reached <- TRUE 
+  # }
+  # print(paste0("At Timestep: ", t, " Total Hospitalizations: ", get_H_total(y)))
+  # print(paste0("At Timestep: ", t, " Hospital Capacity Reached: ", H_capacity_reached))
+  
   # Updates
   dS_C <- -(lambdaC_RSV + lambdaC_COV + lambdaC_FLU)*S_C + omega_RSV*R_C_RSV + omega_COV*R_C_COV + omega_FLU*R_C_FLU
   dS_OC <- -(lambdaOC_RSV + lambdaOC_COV + lambdaOC_FLU)*S_OC + omega_RSV*R_OC_RSV + omega_COV*R_OC_COV + omega_FLU*R_OC_FLU
@@ -37,22 +45,31 @@ seir_rev <- function(t, y, pars){
     (lambdaC_RSV * vaccC_RSV * ve_RSV)*R_C_COV +
     (lambdaC_RSV * vaccC_RSV * ve_RSV)*R_C_FLU 
   dI_C_RSV_vax <- epsilon_RSV*E_C_RSV_vax - gammaI_RSV*I_C_RSV_vax
-  dH_C_RSV_vax <- probHC_RSV_vax*gammaI_RSV*I_C_RSV_vax - gammaH_RSV*H_C_RSV_vax
-  dD_C_RSV_vax <- alphaC_RSV*gammaH_RSV*H_C_RSV_vax
+  if (H_capacity_reached) {
+    dH_C_RSV_vax <- -gammaH_RSV*H_C_RSV_vax
+    dD_C_RSV_vax <- alphaC_RSV*gammaH_RSV*H_C_RSV_vax + probHC_RSV_vax*gammaI_RSV*I_C_RSV_vax
+  } else {
+    dH_C_RSV_vax <- probHC_RSV_vax*gammaI_RSV*I_C_RSV_vax - gammaH_RSV*H_C_RSV_vax
+    dD_C_RSV_vax <- alphaC_RSV*gammaH_RSV*H_C_RSV_vax
+  }
   
   dE_C_RSV <- (lambdaC_RSV * (1-vaccC_RSV))*S_C - epsilon_RSV*E_C_RSV + 
     (lambdaC_RSV * (1-vaccC_RSV))*R_C_COV +
     (lambdaC_RSV * (1-vaccC_RSV))*R_C_FLU 
   dI_C_RSV <- epsilon_RSV*E_C_RSV - gammaI_RSV*I_C_RSV
-  dH_C_RSV <- probHC_RSV*gammaI_RSV*I_C_RSV - gammaH_RSV*H_C_RSV
-  dD_C_RSV <- alphaC_RSV*gammaH_RSV*H_C_RSV
+  if (H_capacity_reached){
+    dH_C_RSV <- -gammaH_RSV*H_C_RSV
+    dD_C_RSV <- alphaC_RSV*gammaH_RSV*H_C_RSV + probHC_RSV*gammaI_RSV*I_C_RSV
+  } else {
+    dH_C_RSV <- probHC_RSV*gammaI_RSV*I_C_RSV - gammaH_RSV*H_C_RSV
+    dD_C_RSV <- alphaC_RSV*gammaH_RSV*H_C_RSV
+  }
   
   dR_C_RSV <- (1-probHC_RSV)*gammaI_RSV*I_C_RSV + (1-alphaC_RSV)*gammaH_RSV*H_C_RSV - omega_RSV*R_C_RSV -
     (lambdaC_COV * vaccC_COV * ve_COV)*R_C_RSV -
     (lambdaC_COV * (1 - vaccC_COV)) * R_C_RSV -
     (lambdaC_FLU * vaccC_FLU * ve_FLU) * R_C_RSV -
     (lambdaC_FLU * (1 - vaccC_FLU)) * R_C_RSV
-  
   
   ### Older Children
   dE_OC_RSV_vax <- (lambdaOC_RSV * vaccOC_RSV * ve_RSV)*S_OC - epsilon_RSV*E_OC_RSV_vax +
@@ -66,8 +83,13 @@ seir_rev <- function(t, y, pars){
     (lambdaOC_RSV * (1-vaccOC_RSV))*R_OC_COV +
     (lambdaOC_RSV * (1-vaccOC_RSV))*R_OC_FLU 
   dI_OC_RSV <- epsilon_RSV*E_OC_RSV - gammaI_RSV*I_OC_RSV
-  dH_OC_RSV <- probHOC_RSV*gammaI_RSV*I_OC_RSV - gammaH_RSV*H_OC_RSV
-  dD_OC_RSV <- alphaOC_RSV*gammaH_RSV*H_OC_RSV
+  if (H_capacity_reached){
+    dH_OC_RSV <-  - gammaH_RSV*H_OC_RSV
+    dD_OC_RSV <- alphaOC_RSV*gammaH_RSV*H_OC_RSV + probHOC_RSV*gammaI_RSV*I_OC_RSV
+  } else {
+    dH_OC_RSV <- probHOC_RSV*gammaI_RSV*I_OC_RSV - gammaH_RSV*H_OC_RSV
+    dD_OC_RSV <- alphaOC_RSV*gammaH_RSV*H_OC_RSV
+  }
   
   dR_OC_RSV <- (1-probHOC_RSV)*gammaI_RSV*I_OC_RSV + (1-alphaOC_RSV)*gammaH_RSV*H_OC_RSV - omega_RSV*R_OC_RSV -
     (lambdaOC_COV * vaccOC_COV * ve_COV)*R_OC_RSV -
@@ -81,15 +103,25 @@ seir_rev <- function(t, y, pars){
     (lambdaA_RSV * vaccA_RSV * ve_RSV)*R_A_COV +
     (lambdaA_RSV * vaccA_RSV * ve_RSV)*R_A_FLU 
   dI_A_RSV_vax <- epsilon_RSV*E_A_RSV_vax - gammaI_RSV*I_A_RSV_vax
-  dH_A_RSV_vax <- probHA_RSV_vax*gammaI_RSV*I_A_RSV_vax - gammaH_RSV*H_A_RSV_vax
-  dD_A_RSV_vax <- alphaA_RSV*gammaH_RSV*H_A_RSV_vax
+  if (H_capacity_reached){
+    dH_A_RSV_vax <- -gammaH_RSV*H_A_RSV_vax
+    dD_A_RSV_vax <- alphaA_RSV*gammaH_RSV*H_A_RSV_vax + probHA_RSV_vax*gammaI_RSV*I_A_RSV_vax
+  } else {
+    dH_A_RSV_vax <- probHA_RSV_vax*gammaI_RSV*I_A_RSV_vax - gammaH_RSV*H_A_RSV_vax
+    dD_A_RSV_vax <- alphaA_RSV*gammaH_RSV*H_A_RSV_vax
+  }
   
   dE_A_RSV <- (lambdaA_RSV * (1-vaccA_RSV))*S_A - epsilon_RSV*E_A_RSV +
     (lambdaA_RSV * (1-vaccA_RSV))*R_A_COV +
     (lambdaA_RSV * (1-vaccA_RSV))*R_A_FLU 
   dI_A_RSV <- epsilon_RSV*E_A_RSV - gammaI_RSV*I_A_RSV
-  dH_A_RSV <- probHA_RSV*gammaI_RSV*I_A_RSV - gammaH_RSV*H_A_RSV
-  dD_A_RSV <- alphaA_RSV*gammaH_RSV*H_A_RSV
+  if (H_capacity_reached){
+    dH_A_RSV <-  -gammaH_RSV*H_A_RSV
+    dD_A_RSV <- alphaA_RSV*gammaH_RSV*H_A_RSV + probHA_RSV*gammaI_RSV*I_A_RSV
+  } else {
+    dH_A_RSV <- probHA_RSV*gammaI_RSV*I_A_RSV - gammaH_RSV*H_A_RSV
+    dD_A_RSV <- alphaA_RSV*gammaH_RSV*H_A_RSV
+  }
   
   dR_A_RSV <- (1-probHA_RSV)*gammaI_RSV*I_A_RSV + (1-alphaA_RSV)*gammaH_RSV*H_A_RSV - omega_RSV*R_A_RSV -
     (lambdaA_COV * vaccA_COV * ve_COV)*R_A_RSV -
@@ -102,15 +134,25 @@ seir_rev <- function(t, y, pars){
     (lambdaS_RSV * vaccS_RSV * ve_RSV)*R_S_COV +
     (lambdaS_RSV * vaccS_RSV * ve_RSV)*R_S_FLU 
   dI_S_RSV_vax <- epsilon_RSV*E_S_RSV_vax - gammaI_RSV*I_S_RSV_vax
-  dH_S_RSV_vax <- probHS_RSV_vax*gammaI_RSV*I_S_RSV_vax - gammaH_RSV*H_S_RSV_vax
-  dD_S_RSV_vax <- alphaS_RSV*gammaH_RSV*H_S_RSV_vax
+  if (H_capacity_reached){
+    dH_S_RSV_vax <-  -gammaH_RSV*H_S_RSV_vax
+    dD_S_RSV_vax <- alphaS_RSV*gammaH_RSV*H_S_RSV_vax + probHS_RSV_vax*gammaI_RSV*I_S_RSV_vax
+  } else {
+    dH_S_RSV_vax <- probHS_RSV_vax*gammaI_RSV*I_S_RSV_vax - gammaH_RSV*H_S_RSV_vax
+    dD_S_RSV_vax <- alphaS_RSV*gammaH_RSV*H_S_RSV_vax
+  }
   
   dE_S_RSV <- (lambdaS_RSV * (1-vaccS_RSV))*S_S - epsilon_RSV*E_S_RSV +
     (lambdaS_RSV * (1-vaccS_RSV))*R_S_COV +
     (lambdaS_RSV * (1-vaccS_RSV))*R_S_FLU 
   dI_S_RSV <- epsilon_RSV*E_S_RSV - gammaI_RSV*I_S_RSV
-  dH_S_RSV <- probHS_RSV*gammaI_RSV*I_S_RSV - gammaH_RSV*H_S_RSV
-  dD_S_RSV <- alphaS_RSV*gammaH_RSV*H_S_RSV
+  if (H_capacity_reached){
+    dH_S_RSV <-  -gammaH_RSV*H_S_RSV
+    dD_S_RSV <- alphaS_RSV*gammaH_RSV*H_S_RSV + probHS_RSV*gammaI_RSV*I_S_RSV
+  } else {
+    dH_S_RSV <- probHS_RSV*gammaI_RSV*I_S_RSV - gammaH_RSV*H_S_RSV
+    dD_S_RSV <- alphaS_RSV*gammaH_RSV*H_S_RSV
+  }
   
   dR_S_RSV <- (1-probHS_RSV)*gammaI_RSV*I_S_RSV + (1-alphaS_RSV)*gammaH_RSV*H_S_RSV - omega_RSV*R_S_RSV -
     (lambdaS_COV * vaccS_COV * ve_COV)*R_S_RSV -
@@ -124,15 +166,25 @@ seir_rev <- function(t, y, pars){
     (lambdaC_COV * vaccC_COV * ve_COV)*R_C_RSV +
     (lambdaC_COV * vaccC_COV * ve_COV)*R_C_FLU 
   dI_C_COV_vax <- epsilon_COV*E_C_COV_vax - gammaI_COV*I_C_COV_vax
-  dH_C_COV_vax <- probHC_COV_vax*gammaI_COV*I_C_COV_vax - gammaH_COV*H_C_COV_vax
-  dD_C_COV_vax <- alphaC_COV*gammaH_COV*H_C_COV_vax
+  if (H_capacity_reached){
+    dH_C_COV_vax <-  -gammaH_COV*H_C_COV_vax
+    dD_C_COV_vax <- alphaC_COV*gammaH_COV*H_C_COV_vax + probHC_COV_vax*gammaI_COV*I_C_COV_vax
+  } else {
+    dH_C_COV_vax <- probHC_COV_vax*gammaI_COV*I_C_COV_vax - gammaH_COV*H_C_COV_vax
+    dD_C_COV_vax <- alphaC_COV*gammaH_COV*H_C_COV_vax
+  }
   
   dE_C_COV <- (lambdaC_COV * (1-vaccC_COV))*S_C - epsilon_COV*E_C_COV +
     (lambdaC_COV * (1-vaccC_COV))*R_C_RSV +
     (lambdaC_COV * (1-vaccC_COV))*R_C_FLU 
   dI_C_COV <- epsilon_COV*E_C_COV - gammaI_COV*I_C_COV
-  dH_C_COV <- probHC_COV*gammaI_COV*I_C_COV - gammaH_COV*H_C_COV
-  dD_C_COV <- alphaC_COV*gammaH_COV*H_C_COV
+  if (H_capacity_reached){
+    dH_C_COV <- -gammaH_COV*H_C_COV
+    dD_C_COV <- alphaC_COV*gammaH_COV*H_C_COV + probHC_COV*gammaI_COV*I_C_COV
+  } else {
+    dH_C_COV <- probHC_COV*gammaI_COV*I_C_COV - gammaH_COV*H_C_COV
+    dD_C_COV <- alphaC_COV*gammaH_COV*H_C_COV
+  }
   
   dR_C_COV <- (1-probHC_COV)*gammaI_COV*I_C_COV + (1-alphaC_COV)*gammaH_COV*H_C_COV - omega_COV*R_C_COV -
     (lambdaC_RSV * vaccC_RSV * ve_RSV)*R_C_COV -
@@ -145,15 +197,26 @@ seir_rev <- function(t, y, pars){
     (lambdaOC_COV * vaccOC_COV * ve_COV)*R_OC_RSV +
     (lambdaOC_COV * vaccOC_COV * ve_COV)*R_OC_FLU 
   dI_OC_COV_vax <- epsilon_COV*E_OC_COV_vax - gammaI_COV*I_OC_COV_vax
-  dH_OC_COV_vax <- probHOC_COV_vax*gammaI_COV*I_OC_COV_vax - gammaH_COV*H_OC_COV_vax
-  dD_OC_COV_vax <- alphaOC_COV*gammaH_COV*H_OC_COV_vax
+  if (H_capacity_reached){
+    dH_OC_COV_vax <- - gammaH_COV*H_OC_COV_vax
+    dD_OC_COV_vax <- alphaOC_COV*gammaH_COV*H_OC_COV_vax + probHOC_COV_vax*gammaI_COV*I_OC_COV_vax
+  } else {
+    dH_OC_COV_vax <- probHOC_COV_vax*gammaI_COV*I_OC_COV_vax - gammaH_COV*H_OC_COV_vax
+    dD_OC_COV_vax <- alphaOC_COV*gammaH_COV*H_OC_COV_vax
+  }
+  
   
   dE_OC_COV <- (lambdaOC_COV * (1-vaccOC_COV))*S_OC - epsilon_COV*E_OC_COV +
     (lambdaOC_COV * (1-vaccOC_COV))*R_OC_RSV +
     (lambdaOC_COV * (1-vaccOC_COV))*R_OC_FLU 
   dI_OC_COV <- epsilon_COV*E_OC_COV - gammaI_COV*I_OC_COV
-  dH_OC_COV <- probHOC_COV*gammaI_COV*I_OC_COV - gammaH_COV*H_OC_COV
-  dD_OC_COV <- alphaOC_COV*gammaH_COV*H_OC_COV
+  if (H_capacity_reached){
+    dH_OC_COV <-  -gammaH_COV*H_OC_COV
+    dD_OC_COV <- alphaOC_COV*gammaH_COV*H_OC_COV + probHOC_COV*gammaI_COV*I_OC_COV
+  } else {
+    dH_OC_COV <- probHOC_COV*gammaI_COV*I_OC_COV - gammaH_COV*H_OC_COV
+    dD_OC_COV <- alphaOC_COV*gammaH_COV*H_OC_COV
+  }
   
   dR_OC_COV <- (1-probHOC_COV)*gammaI_COV*I_OC_COV + (1-alphaOC_COV)*gammaH_COV*H_OC_COV - omega_COV*R_OC_COV -
     (lambdaOC_RSV * vaccOC_RSV * ve_RSV)*R_OC_COV -
@@ -166,15 +229,25 @@ seir_rev <- function(t, y, pars){
     (lambdaA_COV * vaccA_COV * ve_COV)*R_A_RSV +
     (lambdaA_COV * vaccA_COV * ve_COV)*R_A_FLU 
   dI_A_COV_vax <- epsilon_COV*E_A_COV_vax - gammaI_COV*I_A_COV_vax
-  dH_A_COV_vax <- probHA_COV_vax*gammaI_COV*I_A_COV_vax - gammaH_COV*H_A_COV_vax
-  dD_A_COV_vax <- alphaA_COV*gammaH_COV*H_A_COV_vax
+  if (H_capacity_reached){
+    dH_A_COV_vax <-  -gammaH_COV*H_A_COV_vax
+    dD_A_COV_vax <- alphaA_COV*gammaH_COV*H_A_COV_vax + probHA_COV_vax*gammaI_COV*I_A_COV_vax
+  } else {
+    dH_A_COV_vax <- probHA_COV_vax*gammaI_COV*I_A_COV_vax - gammaH_COV*H_A_COV_vax
+    dD_A_COV_vax <- alphaA_COV*gammaH_COV*H_A_COV_vax
+  }
   
   dE_A_COV <- (lambdaA_COV * (1-vaccA_COV))*S_A - epsilon_COV*E_A_COV +
     (lambdaA_COV * (1-vaccA_COV))*R_A_RSV +
     (lambdaA_COV * (1-vaccA_COV))*R_A_FLU 
   dI_A_COV <- epsilon_COV*E_A_COV - gammaI_COV*I_A_COV
-  dH_A_COV <- probHA_COV*gammaI_COV*I_A_COV - gammaH_COV*H_A_COV
-  dD_A_COV <- alphaA_COV*gammaH_COV*H_A_COV
+  if (H_capacity_reached){
+    dH_A_COV <-  -gammaH_COV*H_A_COV
+    dD_A_COV <- alphaA_COV*gammaH_COV*H_A_COV + probHA_COV*gammaI_COV*I_A_COV
+  } else {
+    dH_A_COV <- probHA_COV*gammaI_COV*I_A_COV - gammaH_COV*H_A_COV
+    dD_A_COV <- alphaA_COV*gammaH_COV*H_A_COV
+  }
   
   dR_A_COV <- (1-probHA_COV)*gammaI_COV*I_A_COV + (1-alphaA_COV)*gammaH_COV*H_A_COV - omega_COV*R_A_COV -
     (lambdaA_RSV * vaccA_RSV * ve_RSV)*R_A_COV -
@@ -187,15 +260,25 @@ seir_rev <- function(t, y, pars){
     (lambdaS_COV * vaccS_COV * ve_COV)*R_S_RSV +
     (lambdaS_COV * vaccS_COV * ve_COV)*R_S_FLU 
   dI_S_COV_vax <- epsilon_COV*E_S_COV_vax - gammaI_COV*I_S_COV_vax
-  dH_S_COV_vax <- probHS_COV_vax*gammaI_COV*I_S_COV_vax - gammaH_COV*H_S_COV_vax
-  dD_S_COV_vax <- alphaS_COV*gammaH_COV*H_S_COV_vax
+  if (H_capacity_reached){
+    dH_S_COV_vax <- -gammaH_COV*H_S_COV_vax
+    dD_S_COV_vax <- alphaS_COV*gammaH_COV*H_S_COV_vax + probHS_COV_vax*gammaI_COV*I_S_COV_vax 
+  } else { 
+    dH_S_COV_vax <- probHS_COV_vax*gammaI_COV*I_S_COV_vax - gammaH_COV*H_S_COV_vax
+    dD_S_COV_vax <- alphaS_COV*gammaH_COV*H_S_COV_vax
+  }
   
   dE_S_COV <- (lambdaS_COV * (1-vaccS_COV))*S_S - epsilon_COV*E_S_COV +
     (lambdaS_COV * (1-vaccS_COV))*R_S_RSV +
     (lambdaS_COV * (1-vaccS_COV))*R_S_FLU 
   dI_S_COV <- epsilon_COV*E_S_COV - gammaI_COV*I_S_COV
-  dH_S_COV <- probHS_COV*gammaI_COV*I_S_COV - gammaH_COV*H_S_COV
-  dD_S_COV <- alphaS_COV*gammaH_COV*H_S_COV
+  if (H_capacity_reached){
+    dH_S_COV <-  -gammaH_COV*H_S_COV
+    dD_S_COV <- alphaS_COV*gammaH_COV*H_S_COV + probHS_COV*gammaI_COV*I_S_COV
+  } else {
+    dH_S_COV <- probHS_COV*gammaI_COV*I_S_COV - gammaH_COV*H_S_COV
+    dD_S_COV <- alphaS_COV*gammaH_COV*H_S_COV
+  }
   
   dR_S_COV <- (1-probHS_COV)*gammaI_COV*I_S_COV + (1-alphaS_COV)*gammaH_COV*H_S_COV - omega_COV*R_S_COV -
     (lambdaS_RSV * vaccS_RSV * ve_RSV)*R_S_COV -
@@ -209,15 +292,25 @@ seir_rev <- function(t, y, pars){
     (lambdaC_FLU * vaccC_FLU * ve_FLU)*R_C_RSV +
     (lambdaC_FLU * vaccC_FLU * ve_FLU)*R_C_COV 
   dI_C_FLU_vax <- epsilon_FLU*E_C_FLU_vax - gammaI_FLU*I_C_FLU_vax
-  dH_C_FLU_vax <- probHC_FLU_vax*gammaI_FLU*I_C_FLU_vax - gammaH_FLU*H_C_FLU_vax
-  dD_C_FLU_vax <- alphaC_FLU*gammaH_FLU*H_C_FLU_vax
+  if (H_capacity_reached) {
+    dH_C_FLU_vax <-  -gammaH_FLU*H_C_FLU_vax
+    dD_C_FLU_vax <- alphaC_FLU*gammaH_FLU*H_C_FLU_vax + probHC_FLU_vax*gammaI_FLU*I_C_FLU_vax
+  } else {
+    dH_C_FLU_vax <- probHC_FLU_vax*gammaI_FLU*I_C_FLU_vax - gammaH_FLU*H_C_FLU_vax
+    dD_C_FLU_vax <- alphaC_FLU*gammaH_FLU*H_C_FLU_vax
+  }
   
   dE_C_FLU <- (lambdaC_FLU * (1-vaccC_FLU))*S_C - epsilon_FLU*E_C_FLU +
     (lambdaC_FLU * (1-vaccC_FLU))*R_C_RSV +
     (lambdaC_FLU * (1-vaccC_FLU))*R_C_COV 
   dI_C_FLU <- epsilon_FLU*E_C_FLU - gammaI_FLU*I_C_FLU
-  dH_C_FLU <- probHC_FLU*gammaI_FLU*I_C_FLU - gammaH_FLU*H_C_FLU
-  dD_C_FLU <- alphaC_FLU*gammaH_FLU*H_C_FLU
+  if (H_capacity_reached){
+    dH_C_FLU <-  -gammaH_FLU*H_C_FLU
+    dD_C_FLU <- alphaC_FLU*gammaH_FLU*H_C_FLU + probHC_FLU*gammaI_FLU*I_C_FLU
+  } else {
+    dH_C_FLU <- probHC_FLU*gammaI_FLU*I_C_FLU - gammaH_FLU*H_C_FLU
+    dD_C_FLU <- alphaC_FLU*gammaH_FLU*H_C_FLU
+  }
   
   dR_C_FLU <- (1-probHC_FLU)*gammaI_FLU*I_C_FLU + (1-alphaC_FLU)*gammaH_FLU*H_C_FLU - omega_FLU*R_C_FLU -
     (lambdaC_RSV * vaccC_RSV * ve_RSV)*R_C_FLU -
@@ -230,15 +323,25 @@ seir_rev <- function(t, y, pars){
     (lambdaOC_FLU * vaccOC_FLU * ve_FLU)*R_OC_RSV +
     (lambdaOC_FLU * vaccOC_FLU * ve_FLU)*R_OC_COV
   dI_OC_FLU_vax <- epsilon_FLU*E_OC_FLU_vax - gammaI_FLU*I_OC_FLU_vax 
-  dH_OC_FLU_vax <- probHOC_FLU_vax*gammaI_FLU*I_OC_FLU_vax - gammaH_FLU*H_OC_FLU_vax
-  dD_OC_FLU_vax <- alphaOC_FLU*gammaH_FLU*H_OC_FLU_vax
+  if (H_capacity_reached){
+    dH_OC_FLU_vax <-  -gammaH_FLU*H_OC_FLU_vax
+    dD_OC_FLU_vax <- alphaOC_FLU*gammaH_FLU*H_OC_FLU_vax + probHOC_FLU_vax*gammaI_FLU*I_OC_FLU_vax
+  } else {
+    dH_OC_FLU_vax <- probHOC_FLU_vax*gammaI_FLU*I_OC_FLU_vax - gammaH_FLU*H_OC_FLU_vax
+    dD_OC_FLU_vax <- alphaOC_FLU*gammaH_FLU*H_OC_FLU_vax
+  }
   
   dE_OC_FLU <- (lambdaOC_FLU * (1-vaccOC_FLU))*S_OC - epsilon_FLU*E_OC_FLU +
     (lambdaOC_FLU * (1-vaccOC_FLU))*R_OC_RSV +
     (lambdaOC_FLU * (1-vaccOC_FLU))*R_OC_COV 
   dI_OC_FLU <- epsilon_FLU*E_OC_FLU - gammaI_FLU*I_OC_FLU
-  dH_OC_FLU <- probHOC_FLU*gammaI_FLU*I_OC_FLU - gammaH_FLU*H_OC_FLU
-  dD_OC_FLU <- alphaOC_FLU*gammaH_FLU*H_OC_FLU
+  if (H_capacity_reached){
+    dH_OC_FLU <-  -gammaH_FLU*H_OC_FLU
+    dD_OC_FLU <- alphaOC_FLU*gammaH_FLU*H_OC_FLU + probHOC_FLU*gammaI_FLU*I_OC_FLU
+  } else {
+    dH_OC_FLU <- probHOC_FLU*gammaI_FLU*I_OC_FLU - gammaH_FLU*H_OC_FLU
+    dD_OC_FLU <- alphaOC_FLU*gammaH_FLU*H_OC_FLU
+  }
   
   dR_OC_FLU <- (1-probHOC_FLU)*gammaI_FLU*I_OC_FLU + (1-alphaOC_FLU)*gammaH_FLU*H_OC_FLU - omega_FLU*R_OC_FLU -
     (lambdaOC_RSV * vaccOC_RSV * ve_RSV)*R_OC_FLU -
@@ -251,15 +354,27 @@ seir_rev <- function(t, y, pars){
     (lambdaA_FLU * vaccA_FLU * ve_FLU)*R_A_RSV +
     (lambdaA_FLU * vaccA_FLU * ve_FLU)*R_A_COV
   dI_A_FLU_vax <- epsilon_FLU*E_A_FLU_vax - gammaI_FLU*I_A_FLU_vax
-  dH_A_FLU_vax <- probHA_FLU_vax*gammaI_FLU*I_A_FLU_vax - gammaH_FLU*H_A_FLU_vax
-  dD_A_FLU_vax <- alphaA_FLU*gammaH_FLU*H_A_FLU_vax
+  if (H_capacity_reached){
+    dH_A_FLU_vax <-  -gammaH_FLU*H_A_FLU_vax
+    dD_A_FLU_vax <- alphaA_FLU*gammaH_FLU*H_A_FLU_vax + probHA_FLU_vax*gammaI_FLU*I_A_FLU_vax
+  } else {
+    dH_A_FLU_vax <- probHA_FLU_vax*gammaI_FLU*I_A_FLU_vax - gammaH_FLU*H_A_FLU_vax
+    dD_A_FLU_vax <- alphaA_FLU*gammaH_FLU*H_A_FLU_vax
+  }
+  
   
   dE_A_FLU <- (lambdaA_FLU * (1-vaccA_FLU))*S_A - epsilon_FLU*E_A_FLU +
     (lambdaA_FLU * (1-vaccA_FLU))*R_A_RSV +
     (lambdaA_FLU * (1-vaccA_FLU))*R_A_COV 
   dI_A_FLU <- epsilon_FLU*E_A_FLU - gammaI_FLU*I_A_FLU
-  dH_A_FLU <- probHA_FLU*gammaI_FLU*I_A_FLU - gammaH_FLU*H_A_FLU
-  dD_A_FLU <- alphaA_FLU*gammaH_FLU*H_A_FLU
+  if (H_capacity_reached){
+    dH_A_FLU <-  -gammaH_FLU*H_A_FLU
+    dD_A_FLU <- alphaA_FLU*gammaH_FLU*H_A_FLU + probHA_FLU*gammaI_FLU*I_A_FLU
+  } else {
+    dH_A_FLU <- probHA_FLU*gammaI_FLU*I_A_FLU - gammaH_FLU*H_A_FLU
+    dD_A_FLU <- alphaA_FLU*gammaH_FLU*H_A_FLU
+  }
+  
   
   dR_A_FLU <- (1-probHA_FLU)*gammaI_FLU*I_A_FLU + (1-alphaA_FLU)*gammaH_FLU*H_A_FLU - omega_FLU*R_A_FLU -
     (lambdaA_RSV * vaccA_RSV * ve_RSV)*R_A_FLU -
@@ -272,15 +387,25 @@ seir_rev <- function(t, y, pars){
     (lambdaS_FLU * vaccS_FLU * ve_FLU)*R_S_RSV +
     (lambdaS_FLU * vaccS_FLU * ve_FLU)*R_S_COV
   dI_S_FLU_vax <- epsilon_FLU*E_S_FLU_vax - gammaI_FLU*I_S_FLU_vax
-  dH_S_FLU_vax <- probHS_FLU_vax*gammaI_FLU*I_S_FLU_vax - gammaH_FLU*H_S_FLU_vax
-  dD_S_FLU_vax <- alphaS_FLU*gammaH_FLU*H_S_FLU_vax
+  if (H_capacity_reached){
+    dH_S_FLU_vax <-  -gammaH_FLU*H_S_FLU_vax
+    dD_S_FLU_vax <- alphaS_FLU*gammaH_FLU*H_S_FLU_vax + probHS_FLU_vax*gammaI_FLU*I_S_FLU_vax
+  } else {
+    dH_S_FLU_vax <- probHS_FLU_vax*gammaI_FLU*I_S_FLU_vax - gammaH_FLU*H_S_FLU_vax
+    dD_S_FLU_vax <- alphaS_FLU*gammaH_FLU*H_S_FLU_vax
+  }
   
   dE_S_FLU <- (lambdaS_FLU * (1-vaccS_FLU))*S_S - epsilon_FLU*E_S_FLU +
     (lambdaS_FLU * (1-vaccS_FLU))*R_S_RSV +
     (lambdaS_FLU * (1-vaccS_FLU))*R_S_COV 
   dI_S_FLU <- epsilon_FLU*E_S_FLU - gammaI_FLU*I_S_FLU
-  dH_S_FLU <- probHS_FLU*gammaI_FLU*I_S_FLU - gammaH_FLU*H_S_FLU
-  dD_S_FLU <- alphaS_FLU*gammaH_FLU*H_S_FLU
+  if (H_capacity_reached){
+    dH_S_FLU <-  -gammaH_FLU*H_S_FLU
+    dD_S_FLU <- alphaS_FLU*gammaH_FLU*H_S_FLU + probHS_FLU*gammaI_FLU*I_S_FLU
+  } else {
+    dH_S_FLU <- probHS_FLU*gammaI_FLU*I_S_FLU - gammaH_FLU*H_S_FLU
+    dD_S_FLU <- alphaS_FLU*gammaH_FLU*H_S_FLU
+  }
   
   dR_S_FLU <- (1-probHS_FLU)*gammaI_FLU*I_S_FLU + (1-alphaS_FLU)*gammaH_FLU*H_S_FLU - omega_FLU*R_S_FLU -
     (lambdaS_RSV * vaccS_RSV * ve_RSV)*R_S_FLU -

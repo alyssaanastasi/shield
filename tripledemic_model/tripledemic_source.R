@@ -61,7 +61,7 @@ plot_infections_percent_by_vacc <- function(df, t, novac){
   if (missing(novac)){
     plot <- df %>% filter(type == "Infected") %>%
       filter(time <= t) %>%
-      ggplot(aes(x=time,y=percent, color=vacc_type)) + 
+      ggplot(aes(x=time, y=age_percent, color=vacc_type)) + 
       geom_line() + 
       facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) +
       ylim(0, .2) +
@@ -71,7 +71,7 @@ plot_infections_percent_by_vacc <- function(df, t, novac){
     plot <- df %>% filter(type == "Infected") %>% 
       filter(vacc_type == "Unvaccinated") %>%
       filter(time <= 400) %>%
-      ggplot(aes(x=time, y=percent, color=disease_group)) + 
+      ggplot(aes(x=time, y=vacc_percent, color=disease_group)) + 
       geom_line() + 
       facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) + 
       ylim(0, .2) + 

@@ -50,9 +50,14 @@ df_currvac <- run_ode(init=init, seir_fn=seir_rev, times=times, parms=currvac_pa
 
 ```{r}
 currvac_plot_ct <- plot_infections_count_by_vacc(df_currvac, 400)
+save_plot(currvac_plot_ct, "currvac_ct", 6, 4)
 currvac_plot_pct <- plot_infections_percent_by_vacc(df_currvac, 400)
+save_plot(currvac_plot_pct, "currvac_pct", 6, 4)
 currvac_overall <- plot_percent_total_infections(df_currvac)
 save_plot(currvac_overall, "currvac_overall", 6, 4)
+currvac_hosp <- plot_hosp_count_by_vacc(df_currvac, 400)
+currvac_deaths <- plot_cum_deaths(df_currvac, novac=TRUE)
+save_plot(currvac_deaths, "currvac_deaths", 6, 4)
 ```
 
 ## Four Scenarios

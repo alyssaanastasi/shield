@@ -168,7 +168,8 @@ currvac_parms <- c(   #R0 - 3
               probHA_RSV = 0.00118, probHA_RSV_vax = .56*0.00118,
               probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
               ss_RSV = 0.5, si_RSV = 0.5,
-              vaccC_RSV = 0.29, vaccOC_RSV = .222, vaccA_RSV = .222, vaccS_RSV = .222,
+              vaccC_RSV = 0.29, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = .40,
+              # Senior Vaccination estimated from CDC : https://www.cdc.gov/rsvvaxview/dashboard/adults-60-coverage-intent.html 
               ve_RSV = .81,
               
               # R0 - 3.82

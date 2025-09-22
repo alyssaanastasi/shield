@@ -56,7 +56,7 @@ save_plot(currvac_plot_pct, "currvac_pct", 6, 4)
 currvac_overall <- plot_percent_total_infections(df_currvac)
 save_plot(currvac_overall, "currvac_overall", 6, 4)
 currvac_hosp <- plot_hosp_count_by_vacc(df_currvac, 400)
-currvac_deaths <- plot_cum_deaths(df_currvac, novac=TRUE)
+currvac_deaths <- plot_cum_deaths(df_currvac)
 save_plot(currvac_deaths, "currvac_deaths", 6, 4)
 ```
 

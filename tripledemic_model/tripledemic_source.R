@@ -66,6 +66,7 @@ plot_infections_percent_by_vacc <- function(df, t, novac){
       facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) +
       ylim(0, .2) +
       # scale_color_paletteer_d("nationalparkcolors::Acadia") +
+      labs("Vaccination Type") + 
       ggtitle(paste("Infections by Vaccination Type (Percent)"))
   } else {
     plot <- df %>% filter(type == "Infected") %>% 
@@ -139,14 +140,17 @@ plot_cum_deaths <- function(df, novac){
       scale_color_paletteer_d("tvthemes::Amethyst") +
       ggtitle("Cumulative Deaths (Count)")
   } else {
-    plot <- df %>% filter(type == "Hospitalized") %>% 
-      filter(vacc_type == "Unvaccinated") %>%
-      filter(time <= 400) %>%
-      ggplot(aes(x=time,y=value)) + 
+    plot <- df %>% filter(type == "Dead") %>%
+      group_by(time, age_group, disease_group, vacc_type) %>%
+      mutate(cum_death = cumsum(value)) %>%
+      ungroup() %>%
+      ggplot(aes(x=time,y=cum_death, color=vacc_type)) + 
       geom_line() + 
-      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) + 
-      geom_hline(yintercept=12334, col="red", linetype="dotted") +
-      ggtitle(paste("Hospitalizations of Unvaccinated Individuals (Count)"))
+      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE, scales="free") +
+      xlab("Time (Days)") +
+      ylab("Cumulative Deaths (Count)") +
+      labs(color = "Vaccination Type") + 
+      ggtitle("Cumulative Deaths (Count)")
   }
   return(plot)
 }

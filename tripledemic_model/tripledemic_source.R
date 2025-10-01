@@ -1,5 +1,12 @@
 library(deSolve)
 
+#' Runs SIR model using deSolve ode and cleans output datagrame 
+#' 
+#' @param init starting compartment vector
+#' @param seir_fn SEIR model function
+#' @param times time vector for length of SIR run
+#' @param parms SEIR model parameters
+#' @return dataframe of output of SEIR model at each timestep
 run_ode <- function(init, seir_fn, times, parms){
   df <- ode(y=init, func = seir_fn, times=times, parms = parms) %>%
     as.data.frame() %>% as_tibble() %>% pivot_longer(-time) %>%
@@ -35,6 +42,7 @@ run_ode <- function(init, seir_fn, times, parms){
   df$age_groupf = factor(df$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
   return(df)
 }
+
 
 plot_infections_count_by_vacc <- function(df, t, novac){
   if (missing(novac)){

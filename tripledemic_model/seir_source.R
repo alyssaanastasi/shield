@@ -1,9 +1,17 @@
+# Source functions for SEIR model
+
 library(deSolve)
 library(tidyverse)
 
+
+# List of ages & diseases in Model
 ages <- c("C", "OC", "A", "S")
 diseases <- c("RSV", "COV", "FLU")
 
+#' Returns a vector of totals by group of (age, disease) 
+#' 
+#' @param y vector of current compartment counts 
+#' @return vector of totals in each group by (age, disease) like RSV_C: 2
 make_group_totals <- function(y) {
   list2env(as.list(y), envir = environment())
   return_vec <- c()
@@ -24,6 +32,7 @@ make_group_totals <- function(y) {
   return(return_vec)
 }
 
+#' Returns sum of infected individuals 
 get_infected_sums <- function(y, si_RSV, si_COV, si_FLU){
   list2env(as.list(y), envir = environment())
   si_vals <- c("RSV" = si_RSV, "COV" = si_COV, "FLU" = si_FLU)

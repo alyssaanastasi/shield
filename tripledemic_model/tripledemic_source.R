@@ -124,6 +124,28 @@ plot_hosp_count_by_vacc <- function(df, t, novac){
   return(plot)
 }
 
+plot_hosp_count_by_vacc <- function(df, t, novac){
+  if (missing(novac)){
+    plot <- df %>% filter(type == "Hospitalized") %>%
+      filter(time <= t) %>%
+      ggplot(aes(x=time,y=value, color=vacc_type)) + 
+      geom_line() + 
+      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) +
+      geom_hline(yintercept=12334, col="red", linetype="dotted") +
+      ggtitle("Hospitalizations by Vaccination Type (Count)")
+  } else {
+    plot <- df %>% filter(type == "Hospitalized") %>% 
+      filter(vacc_type == "Unvaccinated") %>%
+      filter(time <= 400) %>%
+      ggplot(aes(x=time,y=value)) + 
+      geom_line() + 
+      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) + 
+      geom_hline(yintercept=12334, col="red", linetype="dotted") +
+      ggtitle(paste("Hospitalizations of Unvaccinated Individuals (Count)"))
+  }
+  return(plot)
+}
+
 plot_cum_deaths <- function(df, novac){
   if (!missing(novac)){
     plot <- df %>% filter(type == "Dead") %>%

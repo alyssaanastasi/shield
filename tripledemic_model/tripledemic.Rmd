@@ -34,14 +34,16 @@ df_novac <- run_ode(init=init, seir_fn=seir_rev, times=times, parms=novac_parms)
 
 ```{R}
 novac_plot_ct <- plot_infections_count_by_vacc(df_novac, 400, novac=TRUE)
-save_plot(novac_plot_ct, "novac_ct")
-novac_plot_pct <- plot_infections_percent_by_vacc(df_novac, 400, novac=TRUE) 
-save_plot(novac_plot_pct, "novac_pct")
-novac_overall <- plot_percent_total_infections(df_novac)
+# novac_plot_ct
+# save_plot(novac_plot_ct, "novac_ct")
+# novac_plot_pct <- plot_infections_percent_by_vacc(df_novac, 400, novac=TRUE) 
+# save_plot(novac_plot_pct, "novac_pct")
+# novac_overall <- plot_percent_total_infections(df_novac)
 novac_hosp <- plot_hosp_count_by_vacc(df_novac, 400, novac=TRUE)
-novac_deaths <- plot_cum_deaths(df_novac, novac=TRUE)
-save_plot(novac_deaths, "novac_deaths")
-novac_deaths
+novac_hosp
+# novac_deaths <- plot_cum_deaths(df_novac, novac=TRUE)
+# save_plot(novac_deaths, "novac_deaths")
+# novac_deaths
 ```
 ## Current Vaccination
 ```{R}

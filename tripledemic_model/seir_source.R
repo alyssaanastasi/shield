@@ -98,3 +98,7 @@ get_H_total <- function(y){
   H_total <- sum(unlist(all_H))
   return(H_total)
 }
+
+delta_modify <- function(t, disease){
+  return(0.1*sin(2*pi*(t-365/2)/365))
+}

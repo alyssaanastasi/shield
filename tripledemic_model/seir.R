@@ -4,9 +4,16 @@ source("seir_source.R")
 
 #### Tripledemic SEIR model ####
 
+#' Tripledemic SEIR model for use in ODE function in deSolve package 
+#' Returns list of gradients for each compartment at current timestep t
+#' 
+#' @param t current timestep
+#' @param y vector of current compartment counts 
+#' @param pars parameters of tripledemic model 
+#' @return list of gradients for each compartment 
 seir <- function(t, y, pars){
   # For COVID, Flu, & RSV
-  # S -> E -> I -> H -> S or D
+  # S -> E -> I -> H -> R or D
   #             -> D
   
   # We have 4 distinct age groups abbreviated as follows:
@@ -32,11 +39,11 @@ seir <- function(t, y, pars){
   H_cap_h <- 1
   H_cap_d <- 0 
   # H_cap_reached <- FALSE #Debugging Parm
-  # if (get_H_total(y) > H_cap){
+  if (get_H_total(y) > H_cap){
   #   H_cap_reached <- TRUE
-  #   H_cap_h <- 0
-  #   H_cap_d <- 1
-  # }
+     H_cap_h <- 0
+     H_cap_d <- 1
+  }
   
   # print(paste0("At Timestep: ", t, " Total Hospitalizations: ", get_H_total(y)))
   # print(paste0("At Timestep: ", t, " Hospital Capacity Reached: ", H_cap_reached))

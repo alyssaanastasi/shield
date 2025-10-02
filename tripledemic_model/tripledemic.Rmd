@@ -21,7 +21,7 @@ library(paletteer)
 library(bbmle)
 library(mgcv)
 source("seir_params.R")
-source("seir_rev.R")
+source("seir.R")
 source("tripledemic_source.R")
 ```
 

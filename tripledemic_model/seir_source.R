@@ -32,7 +32,13 @@ make_group_totals <- function(y) {
   return(return_vec)
 }
 
-#' Returns sum of infected individuals 
+#' Returns sum of infected individuals in by each age & disease
+#' 
+#' @param y vector of current compartment counts
+#' @param si_RSV scale infectiousness for RSV
+#' @param si_COV scale infectiousness for COVID
+#' @param si_FLU scale infectiousness for FLU
+#' @return vector of total infected individuals bby (age, disease) with name sumI_age_disease 
 get_infected_sums <- function(y, si_RSV, si_COV, si_FLU){
   list2env(as.list(y), envir = environment())
   si_vals <- c("RSV" = si_RSV, "COV" = si_COV, "FLU" = si_FLU)
@@ -52,6 +58,11 @@ get_infected_sums <- function(y, si_RSV, si_COV, si_FLU){
   return(return_vec)
 }
 
+#' Returns total population for each age group 
+#' 
+#' @param y vector of current compartment counts 
+#' @param group_totals vector of group totals by disease and age like RSV_C = 2
+#' @return vector of total population for each age group in format : "C" = popC, "OC" = popOC, "A" = popA, "S" = popS
 get_pop <- function(y, group_totals){
   list2env(as.list(y), envir=environment())
   list2env(as.list(group_totals), envir=environment())
@@ -62,6 +73,12 @@ get_pop <- function(y, group_totals){
   return(c("C" = popC, "OC" = popOC, "A" = popA, "S" = popS))
 }
 
+#' Returns lambda values for each age group and disease for use in Tripledemic SEIR
+#' 
+#' @param parms disease parameters for SIR model
+#' @param y vector of current compartment counts 
+#' @param cmat contact matrix
+#' @return vector of lambdas for each age & disease group in format lambda_C_RSV etc
 get_lambdas <- function(parms, y, cmat){
   # list2env(as.list(parms), envir=environment())
   group_totals <- make_group_totals(y)
@@ -93,6 +110,10 @@ get_lambdas <- function(parms, y, cmat){
   return(lambda_vec)
 }
 
+#' Returns overall total number of people current in hospitalized compartment
+#' 
+#' @param y vector of current compartment counts
+#' @return Integer of total people currently hospitalized 
 get_H_total <- function(y){
   list2env(as.list(y), envir = environment())
   names <-c()
@@ -108,6 +129,12 @@ get_H_total <- function(y){
   return(H_total)
 }
 
+#' Returns modification for beta for seasonality 
+#' 
+#' NOT FINISHED
+#' @param t current timestep
+#' @param disease disease beta that needs modifying
+#' @return A number to modify/scale current beta value 
 delta_modify <- function(t, disease){
   return(0.1*sin(2*pi*(t-365/2)/365))
 }

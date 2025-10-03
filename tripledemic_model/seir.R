@@ -36,14 +36,8 @@ seir <- function(t, y, pars){
   # Set H_cap parameters: 
   ### H_cap_h is the parameter for hospitalizations. 1 if hospitals have not reached capacity, 0 if they have not
   ### H_cap_d is the parameter for deaths. 1 if hospitals have reached capacity (and people die instead), 0 if they have not 
-  H_cap_h <- 1
-  H_cap_d <- 0 
-  # H_cap_reached <- FALSE #Debugging Parm
-  if (get_H_total(y) > H_cap){
-  #   H_cap_reached <- TRUE
-     H_cap_h <- 0
-     H_cap_d <- 1
-  }
+  H_cap_h = ifelse(get_H_total(y) > H_cap, 0, 1)
+  H_cap_d = ifelse(get_H_total(y) > H_cap, 1, 0)
   
   # print(paste0("At Timestep: ", t, " Total Hospitalizations: ", get_H_total(y)))
   # print(paste0("At Timestep: ", t, " Hospital Capacity Reached: ", H_cap_reached))
@@ -81,8 +75,8 @@ seir <- function(t, y, pars){
     (lambdaOC_RSV * vaccOC_RSV * ve_RSV)*R_OC_COV +
     (lambdaOC_RSV * vaccOC_RSV * ve_RSV)*R_OC_FLU 
   dI_OC_RSV_vax <- epsilon_RSV*E_OC_RSV_vax - gammaI_RSV*I_OC_RSV_vax
-  dH_OC_RSV_vax <- probHOC_RSV_vax*gammaI_RSV*I_OC_RSV_vax - gammaH_RSV*H_OC_RSV_vax
-  dD_OC_RSV_vax <- alphaOC_RSV*gammaH_RSV*H_OC_RSV_vax
+  dH_OC_RSV_vax <- -gammaH_RSV*H_OC_RSV_vax + H_cap_h*probHOC_RSV_vax*gammaI_RSV*I_OC_RSV_vax
+  dD_OC_RSV_vax <- alphaOC_RSV*gammaH_RSV*H_OC_RSV_vax + H_cap_d*probHOC_RSV_vax*gammaI_RSV*I_OC_RSV_vax
   
   dE_OC_RSV <- (lambdaOC_RSV * (1-vaccOC_RSV))*S_OC - epsilon_RSV*E_OC_RSV +
     (lambdaOC_RSV * (1-vaccOC_RSV))*R_OC_COV +
@@ -136,7 +130,7 @@ seir <- function(t, y, pars){
   
   dR_S_RSV <- (1-probHS_RSV)*gammaI_RSV*I_S_RSV + (1-alphaS_RSV)*gammaH_RSV*H_S_RSV - omega_RSV*R_S_RSV -
     (lambdaS_COV * vaccS_COV * ve_COV)*R_S_RSV -
-    (lambdaS_COV * (1 - vaccA_COV)) * R_S_RSV -
+    (lambdaS_COV * (1 - vaccS_COV)) * R_S_RSV -
     (lambdaS_FLU * vaccS_FLU * ve_FLU) * R_S_RSV -
     (lambdaS_FLU * (1 - vaccS_FLU)) * R_S_RSV
   

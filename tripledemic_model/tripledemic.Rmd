@@ -29,7 +29,7 @@ source("tripledemic_source.R")
 
 ## No Vaccination
 ```{R}
-df_novac <- run_ode(init=init, seir_fn=seir_rev, times=times, parms=novac_parms)
+df_novac <- run_ode(init=init, seir_fn=seir, times=times, parms=novac_parms)
 ```
 
 ```{R}

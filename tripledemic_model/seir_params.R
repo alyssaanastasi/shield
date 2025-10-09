@@ -4,7 +4,7 @@ library(socialmixr)
 
 #### General parameters ####
 
-times <- 1:400
+times <- 1:3652
 PopT <- 12549689 # Census Data for Illinois
 
 # Source: Census broken down by age & gender 

@@ -44,10 +44,11 @@ run_ode <- function(init, seir_fn, times, parms){
 }
 
 
-plot_infections_count_by_vacc <- function(df, t, novac){
+plot_infections_count_by_vacc <- function(df, tmin, tmax, novac){
   if (missing(novac)){
     plot <- df %>% filter(type == "Infected") %>%
-      filter(time <= t) %>%
+      filter(time >= tmin) %>% 
+      filter(time <= tmax) %>%
       ggplot(aes(x=time,y=value, color=vacc_type)) + 
       geom_line() + 
       facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) +
@@ -55,7 +56,8 @@ plot_infections_count_by_vacc <- function(df, t, novac){
   } else {
     plot <- df %>% filter(type == "Infected") %>% 
       filter(vacc_type == "Unvaccinated") %>%
-      filter(time <= 400) %>%
+      filter(time >= tmin) %>% 
+      filter(time <= tmax) %>%
       ggplot(aes(x=time,y=value, color=disease_group)) + 
       geom_line() + 
       scale_color_paletteer_d("tvthemes::Amethyst") +
@@ -79,7 +81,7 @@ plot_infections_percent_by_vacc <- function(df, t, novac){
   } else {
     plot <- df %>% filter(type == "Infected") %>% 
       filter(vacc_type == "Unvaccinated") %>%
-      filter(time <= 400) %>%
+      filter(time <= t) %>%
       ggplot(aes(x=time, y=vacc_percent, color=disease_group)) + 
       geom_line() + 
       facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE) + 
@@ -107,6 +109,23 @@ plot_percent_total_infections <- function(df) {
     labs(color = "Pathogen") +
     scale_color_paletteer_d("tvthemes::Alexandrite") +
     ggtitle(paste("Total Infections by Pathogen (Percent)"))
+  return(plot)
+}
+
+plot_total_infections <- function(df, tmin, tmax) {
+  grouped_df <- df %>% filter(type=="Infected") %>%
+    filter(time >= tmin) %>%
+    filter(time <= tmax) %>%
+    group_by(disease_group, time) %>%
+    summarise(total = sum(value))
+  plot <- grouped_df %>%
+    ggplot(aes(x=time, y=total, color=disease_group)) + 
+    geom_line() + 
+    ylab("Population Infected (Count)") + 
+    xlab("Time (Days)") + 
+    labs(color = "Pathogen") +
+    scale_color_paletteer_d("tvthemes::Alexandrite") +
+    ggtitle(paste("Total Infections by Pathogen (Count)"))
   return(plot)
 }
 

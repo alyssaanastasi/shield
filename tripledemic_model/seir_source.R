@@ -79,7 +79,7 @@ get_pop <- function(y, group_totals){
 #' @param y vector of current compartment counts 
 #' @param cmat contact matrix
 #' @return vector of lambdas for each age & disease group in format lambda_C_RSV etc
-get_lambdas <- function(parms, y, cmat){
+get_lambdas <- function(t, parms, y, cmat){
   # list2env(as.list(parms), envir=environment())
   group_totals <- make_group_totals(y)
   infected_sums <- get_infected_sums(y, unname(parms["si_RSV"]), unname(parms["si_COV"]), unname(parms["si_FLU"]))
@@ -101,7 +101,7 @@ get_lambdas <- function(parms, y, cmat){
         contact_sum <- contact_sum + curr_sum
         i <- i + 1
       }
-      curr_lambda <- parms[beta_name] * contact_sum
+      curr_lambda <- (1 + delta_modify(t, disease)) * parms[beta_name] * contact_sum
       lambda_vec <- c(lambda_vec, setNames(curr_lambda, lambda_name))
       
     }
@@ -131,10 +131,16 @@ get_H_total <- function(y){
 
 #' Returns modification for beta for seasonality 
 #' 
-#' NOT FINISHED
 #' @param t current timestep
 #' @param disease disease beta that needs modifying
 #' @return A number to modify/scale current beta value 
 delta_modify <- function(t, disease){
-  return(0.1*sin(2*pi*(t-365/2)/365))
+  if (disease == "FLU"){
+    return(0.1*sin(2*pi*(t-365/2-100)/365))
+  } else if (disease == "COV") {
+    return(0.1*sin(2*pi*(t-365/2-60)/365))
+  } else if (disease == "RSV") {
+    return(0.1*sin(2*pi*(t-365/2-35)/365))
+  } 
+  return(1)
 }

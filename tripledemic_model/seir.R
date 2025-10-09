@@ -30,14 +30,16 @@ seir <- function(t, y, pars){
   
   # force of infection: 
   # Lambda = x to y population contact * mu * prop of y infected
-  list2env(as.list(get_lambdas(pars, y, cmat)), envir=environment()) #get_lambdas is function used to compute lambda for each age & disease
+  list2env(as.list(get_lambdas(t, pars, y, cmat)), envir=environment()) #get_lambdas is function used to compute lambda for each age & disease
   
   # Check Hospitalization Condition
   # Set H_cap parameters: 
   ### H_cap_h is the parameter for hospitalizations. 1 if hospitals have not reached capacity, 0 if they have not
   ### H_cap_d is the parameter for deaths. 1 if hospitals have reached capacity (and people die instead), 0 if they have not 
-  H_cap_h = ifelse(get_H_total(y) > H_cap, 0, 1)
-  H_cap_d = ifelse(get_H_total(y) > H_cap, 1, 0)
+  H_cap_h <- 0
+  H_cap_d <- 1
+  # H_cap_h = ifelse(get_H_total(y) > H_cap, 0, 1)
+  # H_cap_d = ifelse(get_H_total(y) > H_cap, 1, 0)
   
   # print(paste0("At Timestep: ", t, " Total Hospitalizations: ", get_H_total(y)))
   # print(paste0("At Timestep: ", t, " Hospital Capacity Reached: ", H_cap_reached))

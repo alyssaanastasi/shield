@@ -1,0 +1,126 @@
+---
+title: "Beta Vals"
+author: "Alyssa Anastasi"
+date: "2025-08-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+# We write down the matrices to compute R0 (WITHOUT isolation incorporated -- including T compartments gives a singular matrix )
+
+# a vector naming all infected classes
+istates=c("E_HL","E_MM", "E_LM","E_D",
+          "I_HL","I_MM", "I_LM","I_D",
+          "IA_HL","IA_MM", "IA_LM","IA_D"
+          )
+
+## a list that contains equations (as quotes) for completely new infections entering each infected compartment for each class
+flist=c(dE_HLdt=quote(beta2*S_HL*(epsilon*(I_HL + IA_HL)/N_HL + (1-epsilon)*((I_HL + I_MM + I_LM + I_D + IA_HL + IA_MM + IA_LM + IA_D)/N_all))),
+        dE_MMdt=quote(beta2*S_MM*(epsilon*(I_MM + IA_MM)/N_MM + (1-epsilon)*((I_HL + I_MM + I_LM + I_D + IA_HL + IA_MM + IA_LM + IA_D)/N_all))),
+        dE_LMdt=quote(beta2*S_LM*(epsilon*(I_LM + IA_LM)/N_LM + (1-epsilon)*((I_HL + I_MM + I_LM + I_D + IA_HL + IA_MM + IA_LM + IA_D)/N_all))),
+        dE_Ddt=quote(beta2*S_D*(epsilon*(I_D + IA_D)/N_D + (1-epsilon)*((I_HL + I_MM + I_LM + I_D + IA_HL + IA_MM + IA_LM + IA_D)/N_all))),
+        dI_HLdt=quote(0),dI_MMdt=quote(0),dI_LMdt=quote(0),dI_Ddt=quote(0),
+        dIA_HLdt=quote(0),dIA_MMdt=quote(0),dIA_LMdt=quote(0),dIA_Ddt=quote(0)
+        )
+
+
+#a list that contains the equations (as quotes) for losses out of each infected compartment minus the equations (as quotes) for all gains into each infected compartment that does not represent new infections but transfers among infectious classes
+
+
+
+vlist_gains <- c(
+  ## gains into E
+  quote(0), quote(0), quote(0),  quote(0), 
+  
+  ## gains into I
+  quote(rho_HL_i*alpha*phi*E_HL), 
+  quote(rho_MM_i*alpha*phi*E_MM), 
+  quote(rho_LM_i*alpha*phi*E_LM), 
+  quote(alpha*phi*E_D), 
+  
+  ## gains into IA
+  quote((1-rho_HL_i*alpha)*phi*E_HL),
+  quote((1-rho_MM_i*alpha)*phi*E_MM),
+  quote((1-rho_LM_i*alpha)*phi*E_LM),
+  quote((1-alpha)*phi*E_D)
+)
+
+vlist_losses = c(
+  ## losses out of E
+  quote(phi*E_HL + mu*E_HL), quote(phi*E_MM + mu*E_MM), quote(phi*E_LM + mu*E_LM),  quote(phi*E_D + mu*E_D), 
+  
+  ## losses out of I
+  quote(gamma*I_HL + mu*I_HL), 
+  quote(gamma*I_MM + mu*I_MM), 
+  quote(gamma*I_LM + mu*I_LM), 
+  quote(gamma*I_D + mu*I_D), 
+  
+  ## losses out of IA
+  quote(gamma*IA_HL + mu*IA_HL),
+  quote(gamma*IA_MM + mu*IA_MM),
+  quote(gamma*IA_LM + mu*IA_LM),
+  quote(gamma*IA_D + mu*IA_D)
+)
+
+vlist <- NULL
+for (i in 1:12){
+  x <- substitute(a-b, unlist(list(a=vlist_losses[i], b=vlist_gains[i])))
+  vlist <- c(vlist, x)
+}
+
+
+para = list(beta2 = 10*(0.188/7), 
+            epsilon = 0.1, 
+            phi = 1,
+            alpha = sympt_endemic,
+            gamma = 1/7, 
+           rho_HL_i = 6.5, rho_MM_i = 2, rho_LM_i = 0.8,
+           mu = 1/(75*365),
+           N_all = 10000 + 1500000 + 1500000 + 7500000,
+           N_HL = 10000, N_MM = 1500000, N_LM = 1500000, N_D = 7500000
+           )
+
+df = list(S_HL = 10000, S_MM = 1500000, S_LM = 1500000, S_D = 7500000,
+          E_HL = 0, E_MM = 0, E_LM = 0, E_D = 0,
+          I_HL = 0, I_MM = 0, I_LM = 0, I_D = 0,
+          IA_HL = 0, IA_MM = 0, IA_LM = 0, IA_D = 0,
+          R_HL = 0, R_MM = 0, R_LM = 0, R_D = 0
+          )
+
+nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para, dfe=df)
+
+## calculate R0 across levels of beta2
+
+beta_seq <- seq(0.1,0.2,0.001)
+
+R0_grid <- NULL
+
+# seasonal influenza target R0 is 1.28: https://link.springer.com/article/10.1186/1471-2334-14-480?filter_by=popular&fbclid=IwAR0ORpOJNmAWxFRx3-1wlNztcc53mmrs39JKiV1NHPl-kcaKZCDT1MBYVmw&page=10&utm_campaign=RetargetingUSA&utm_medium=display&utm_source=appnexus
+
+for (i in 1:101){
+  
+  para_i = list(beta2 = beta_seq[i], 
+            epsilon = 0.1, 
+            phi = 1,
+            alpha = sympt_endemic,
+            gamma = 1/7, 
+           rho_HL_i = 6.5, rho_MM_i = 2, rho_LM_i = 0.8,
+           mu = 1/(75*365),
+           N_all = 10000 + 1500000 + 1500000 + 7500000,
+           N_HL = 10000, N_MM = 1500000, N_LM = 1500000, N_D = 7500000
+           )
+  
+  R0 <- nextgenR0(Istates=istates, Flist=flist, Vlist=vlist, parameters=para_i, dfe=df)
+
+  R0_grid <- R0_grid %>% rbind(tibble(R0_value = R0, beta = beta_seq[i]))
+  
+}
+
+## beta = 0.183
+```

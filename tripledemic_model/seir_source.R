@@ -32,6 +32,30 @@ make_group_totals <- function(y) {
   return(return_vec)
 }
 
+#' Returns a vector of totals by group of (age, disease) 
+#' 
+#' @param y vector of current compartment counts 
+#' @return vector of totals in each group by (age, disease) like RSV_C: 2
+make_group_totals_without_R <- function(y) {
+  list2env(as.list(y), envir = environment())
+  return_vec <- c()
+  for (age in ages){
+    for (disease in diseases){
+      names <- c(
+        paste0(c("E","I","H"), "_", age, "_", disease, "_vax"),
+        paste0(c("E","I","H"), "_", age, "_", disease)
+      )
+      curr_name <- paste0(disease,"_", age)
+      # print(curr_name)
+      curr <- mget(names, inherits=TRUE)
+      #print(curr)
+      curr_total <- sum(unlist(curr))
+      return_vec <- c(return_vec, setNames(curr_total,curr_name))
+    }
+  }
+  return(return_vec)
+}
+
 #' Returns sum of infected individuals in by each age & disease
 #' 
 #' @param y vector of current compartment counts
@@ -82,6 +106,43 @@ get_pop <- function(y, group_totals){
 get_lambdas <- function(t, parms, y, cmat){
   # list2env(as.list(parms), envir=environment())
   group_totals <- make_group_totals(y)
+  infected_sums <- get_infected_sums(y, unname(parms["si_RSV"]), unname(parms["si_COV"]), unname(parms["si_FLU"]))
+  age_pops <- get_pop(y, group_totals)
+  lambda_vec <- c()
+  curr_age <- 1
+  for (age in ages) {
+    for (disease in diseases) {
+      lambda_name <- paste0("lambda", age, "_", disease)
+      beta_name <- paste0("beta", "_", disease)
+      
+      # make contact sum
+      contact_sum <- 0
+      i <- 1
+      for (age2 in ages){
+        c <- cmat[curr_age, i]
+        I_name <- paste0("sumI", age2, "_", disease)
+        curr_sum <- c * infected_sums[I_name] / age_pops[age2]
+        contact_sum <- contact_sum + curr_sum
+        i <- i + 1
+      }
+      curr_lambda <- (1 + delta_modify(t, disease)) * parms[beta_name] * contact_sum
+      lambda_vec <- c(lambda_vec, setNames(curr_lambda, lambda_name))
+      
+    }
+    curr_age <- curr_age + 1
+  }
+  return(lambda_vec)
+}
+
+#' Returns lambda values for each age group and disease for use in Tripledemic SEIR
+#' 
+#' @param parms disease parameters for SIR model
+#' @param y vector of current compartment counts 
+#' @param cmat contact matrix
+#' @return vector of lambdas for each age & disease group in format lambda_C_RSV etc
+get_lambdas_without_R <- function(t, parms, y, cmat){
+  # list2env(as.list(parms), envir=environment())
+  group_totals <- make_group_totals_without_R(y)
   infected_sums <- get_infected_sums(y, unname(parms["si_RSV"]), unname(parms["si_COV"]), unname(parms["si_FLU"]))
   age_pops <- get_pop(y, group_totals)
   lambda_vec <- c()
@@ -136,11 +197,11 @@ get_H_total <- function(y){
 #' @return A number to modify/scale current beta value 
 delta_modify <- function(t, disease){
   if (disease == "FLU"){
-    return(0.1*sin(2*pi*(t-365/2-100)/365))
+    return(0.75*sin(2*pi*(t-365/2-100)/365))
   } else if (disease == "COV") {
-    return(0.1*sin(2*pi*(t-365/2-60)/365))
+    return(0.4*sin(2*pi*(t-365/2-60)/365))
   } else if (disease == "RSV") {
-    return(0.1*sin(2*pi*(t-365/2-35)/365))
+    return(0.3*sin(2*pi*(t-365/2-35)/365))
   } 
   return(1)
 }

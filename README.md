@@ -7,9 +7,6 @@ This repository includes:
 ### Tripledemic Paper
 - tripledemic_model
     - seir.R --> Full tripledemic SEIR model
-    - seir_COV.R --> COVID SEIR model
-    - seir_RSV.R --> RSV SEIR model
-    - seir_FLU.R --> FLU SEIR model
     - beta_vals.Rmd --> Code to find beta values from target R0
     - tripledemic.Rmd --> Code to run SEIR & build figures
 

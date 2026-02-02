@@ -30,37 +30,83 @@ source("tripledemic_source.R")
 ## No Vaccination
 ```{R}
 df_novac <- run_ode(init=init, seir_fn=seir, times=times, parms=novac_parms)
+novac_infections <- plot_total_infections(df_novac, 1096, 1461)
+save_plot(novac_infections, "novac_infections", 6, 6)
 ```
 
 ```{R}
-novac_plot_ct <- plot_infections_count_by_vacc(df_novac, 3650, novac=TRUE)
-# novac_plot_ct
-# save_plot(novac_plot_ct, "novac_ct")
-# novac_plot_pct <- plot_infections_percent_by_vacc(df_novac, 400, novac=TRUE) 
+novac_plot_ct <- plot_infections_count_by_vacc(df_novac, 1096, 3652, novac=TRUE)
+novac_plot_ct
+save_plot(novac_plot_ct, "novac_disease", 8, 6)
+novac_plot_prop <- plot_infections_percent_by_vacc(df_novac, 400, novac=TRUE) 
 # save_plot(novac_plot_pct, "novac_pct")
 # novac_overall <- plot_percent_total_infections(df_novac)
 # novac_hosp <- plot_hosp_count_by_vacc(df_novac, 400, novac=TRUE)
-novac_plot_ct
+# novac_plot_ct
 # novac_deaths <- plot_cum_deaths(df_novac, novac=TRUE)
 # save_plot(novac_deaths, "novac_deaths")
 # novac_deaths
-plot_total_infections(df_novac)
+# plot_total_infections(df_novac, 1095, 1461)
+novac_hosp <- plot_total_hosp(df_novac, 0, 1500)
+novac_hosp_disease <- plot_hosp_count_by_vacc(df_novac, 1500, novac=TRUE)
+save_plot(novac_hosp, "novac_total_hosp", 6, 6)
+save_plot(novac_hosp_disease, "novac_hosp_disease", 6, 6)
+novac_hosp
 ```
 ## Current Vaccination
 ```{R}
+# Run SEIR Model for Current Vaccination Parameters
 df_currvac <- run_ode(init=init, seir_fn=seir, times=times, parms=currvac_parms)
+currvac_percent <- plot_percent_total_infections(df_currvac, 1096, 1461)
+currvac_percent
+```
+
+```{R}
+
+```
+
+
+```{R}
+# Get Plots 
+currvac_count <- plot_total_infections(df_currvac, 1095, 3600)
+currvac_percent <- plot_percent_total_infections(df_currvac, 1096, 1461)
+save_plot(currvac_percent, "currvac_percent", 8, 6)
+currvacc_countvacc <- plot_infections_count_by_vacc(df_currvac, 1096, 1461) 
+save_plot(currvacc_countvacc, "currvacc_countvacc", 8, 6)
+```
+
+
+```{R}
+# Vaccinated Only Plot 
+vaccinated_plot <- df_currvac %>% filter(type == "Infected") %>% filter(vacc_type == "Vaccinated") %>%
+      filter(time >= 1096) %>%  
+      filter(time <= 1461) %>%
+      ggplot(aes(x=date,y=value)) + 
+      geom_line() + 
+      scale_x_date(
+        date_labels = "%b",
+        date_breaks = "2 month"
+      ) +
+      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE, scale="free") +
+      ggtitle("Infections of Vaccinated Individuals (Count)")
+save_plot(vaccinated_plot, "currvacc_vaccinated", 8, 6)
+unvaccinated_plot <- df_currvac %>% filter(type == "Infected") %>% filter(vacc_type == "Unvaccinated") %>%
+      filter(time >= 1096) %>%  
+      filter(time <= 1461) %>%
+      ggplot(aes(x=date,y=value)) + 
+      geom_line() + 
+      scale_x_date(
+        date_labels = "%b",
+        date_breaks = "2 month"
+      ) +
+      facet_grid(rows=vars(age_groupf), cols=vars(disease_group), drop = FALSE, scale="free") +
+      ggtitle("Infections of Unvaccinated Individuals (Count)")
+save_plot(unvaccinated_plot, "currvacc_unvaccinated", 8, 6)
+
 ```
 
 ```{r}
-currvac_plot_ct <- plot_infections_count_by_vacc(df_currvac, 400)
-save_plot(currvac_plot_ct, "currvac_ct", 6, 4)
-currvac_plot_pct <- plot_infections_percent_by_vacc(df_currvac, 400)
-save_plot(currvac_plot_pct, "currvac_pct", 6, 4)
-currvac_overall <- plot_percent_total_infections(df_currvac)
-save_plot(currvac_overall, "currvac_overall", 6, 4)
-currvac_hosp <- plot_hosp_count_by_vacc(df_currvac, 400)
-currvac_deaths <- plot_cum_deaths(df_currvac)
-save_plot(currvac_deaths, "currvac_deaths", 6, 4)
+
 ```
 
 ## Four Scenarios

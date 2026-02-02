@@ -234,7 +234,7 @@ para = list( beta_RSV=10*(0.27/5), epsilon_RSV = 1/5, omega_RSV = 1/(5*30), gamm
                probHS_RSV = 0.00939, probHS_RSV_vax = .5*0.00939,
                ss_RSV = 0.5, si_RSV = 0.5,
                vaccC_RSV = 0, vaccOC_RSV = 0, vaccA_RSV = 0, vaccS_RSV = 0,
-               ve_RSV = .81,
+               ve_RSV = (1-.81),
              popC = Pop_children, popOC = Pop_older_children, popA = Pop_adult, popS = Pop_senior
            )
 

@@ -15,6 +15,10 @@ library(dplyr)
 
 ## calibration
 library(bbmle)
+library(mgcv)
+
+source("seir_params.R")
+source("calibration_source.R")
 ```
 
 # Load ICU Data
@@ -29,8 +33,8 @@ data <- data[!duplicated(data), ]
 ```
 
 # COVID-19 Params
-```{R}
-covid_hosp <- data %>% filter(Condition == "COVID-19") %>% pull(Case.Count)
+```{R} 
+cov_data <- data %>% filter(Condition == "COVID-19") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
 
 ## Set parameter boundaries
 
@@ -64,11 +68,11 @@ start = list(
   mu3 = 0.1, 
   mu4 = 0.2, 
   mu5 = 0.05, 
-  mu6 = 0.15,
+  mu6 = 0.1,
   sig_dist = 0.15)
 
 
-m1_A = mle2(minuslogl = loglik,
+m1_A = mle2(minuslogl = cov_loglik,
               start = start,
               data = data,
               method = "L-BFGS-B",
@@ -84,6 +88,117 @@ dt <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
 
-write_csv(dt, "../data/MLE_out_coefficients.csv")
 ```
+# RSV Params
+```{R} 
+rsv_data <- data %>% filter(Condition == "RSV") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
 
+## Set parameter boundaries
+
+#### Set bounds ####
+upper_limit = list(
+  mu1 = 0.5, 
+  mu2 = 0.5, 
+  mu3 = 0.5, 
+  mu4 = 0.5, 
+  mu5 = 0.5, 
+  mu6 = 0.5, 
+  sig_dist = 20
+)
+
+lower_limit = list(
+  mu1 = 0.05, 
+  mu2 = 0.05, 
+  mu3 = 0.05, 
+  mu4 = 0.05, 
+  mu5 = 0.05, 
+  mu6 = 0.05, 
+  sig_dist = 0.05
+)
+
+pr <- 0.01
+pinf <- 0.001
+
+start = list(
+  mu1 = 0.1, 
+  mu2 = 0.1, 
+  mu3 = 0.1, 
+  mu4 = 0.2, 
+  mu5 = 0.05, 
+  mu6 = 0.1,
+  sig_dist = 0.15)
+
+
+m1_A = mle2(minuslogl = rsv_loglik,
+              start = start,
+              data = data,
+              method = "L-BFGS-B",
+              #fixed = list(mu = 0.03),
+              upper= upper_limit,
+              lower = lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(start))))
+  
+full <- summary(m1_A)
+
+dt_RSV <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
+  mutate(param = c("mu1", "mu2", "mu3", "mu4", "mu5", "mu6", "sig_dist")) %>%
+  mutate(loglik = -m1_A@min,
+         AIC = AICc(m1_A))
+
+```
+# Flu Params
+```{R} 
+flu_data <- data %>% filter(Condition == "Flu") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
+
+## Set parameter boundaries
+
+#### Set bounds ####
+upper_limit = list(
+  mu1 = 0.5, 
+  mu2 = 0.5, 
+  mu3 = 0.5, 
+  mu4 = 0.5, 
+  mu5 = 0.5, 
+  mu6 = 0.5, 
+  sig_dist = 20
+)
+
+lower_limit = list(
+  mu1 = 0.05, 
+  mu2 = 0.05, 
+  mu3 = 0.05, 
+  mu4 = 0.05, 
+  mu5 = 0.05, 
+  mu6 = 0.05, 
+  sig_dist = 0.05
+)
+
+pr <- 0.01
+pinf <- 0.001
+
+start = list(
+  mu1 = 0.1, 
+  mu2 = 0.1, 
+  mu3 = 0.1, 
+  mu4 = 0.2, 
+  mu5 = 0.05, 
+  mu6 = 0.1,
+  sig_dist = 0.15)
+
+
+m1_A = mle2(minuslogl = flu_loglik,
+              start = start,
+              data = data,
+              method = "L-BFGS-B",
+              #fixed = list(mu = 0.03),
+              upper= upper_limit,
+              lower = lower_limit,
+              control=list(maxit=20000, trace=TRUE, parscale=abs(unlist(start))))
+  
+full <- summary(m1_A)
+
+dt_flu <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
+  mutate(param = c("mu1", "mu2", "mu3", "mu4", "mu5", "mu6", "sig_dist")) %>%
+  mutate(loglik = -m1_A@min,
+         AIC = AICc(m1_A))
+```

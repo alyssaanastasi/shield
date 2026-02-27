@@ -11,6 +11,7 @@ library(tidyverse)
 library(readxl) ## read excel files
 library(broom)
 library(dplyr)
+library(paletteer)
 
 
 ## calibration
@@ -19,6 +20,8 @@ library(mgcv)
 
 source("seir_params.R")
 source("calibration_source.R")
+source("tripledemic_source.R")
+source("seir.R")
 ```
 
 # Load ICU Data
@@ -40,36 +43,33 @@ cov_data <- data %>% filter(Condition == "COVID-19") %>% filter(date < as.Date("
 
 #### Set bounds ####
 upper_limit = list(
-  mu1 = 0.5, 
-  mu2 = 0.5, 
-  mu3 = 0.5, 
-  mu4 = 0.5, 
-  mu5 = 0.5, 
-  mu6 = 0.5, 
-  sig_dist = 20
+  mu1 = 0.2, 
+  mu2 = 0.2, 
+  mu3 = 0.2, 
+  mu4 = 0.2, 
+  mu5 = 0.2, 
+  mu6 = 0.2, 
+  sig_dist = 5
 )
 
 lower_limit = list(
-  mu1 = 0.05, 
-  mu2 = 0.05, 
-  mu3 = 0.05, 
-  mu4 = 0.05, 
-  mu5 = 0.05, 
-  mu6 = 0.05, 
+  mu1 = 0.001, 
+  mu2 = 0.001, 
+  mu3 = 0.001, 
+  mu4 = 0.001, 
+  mu5 = 0.001, 
+  mu6 = 0.001, 
   sig_dist = 0.05
 )
 
-pr <- 0.01
-pinf <- 0.001
-
 start = list(
-  mu1 = 0.1, 
-  mu2 = 0.1, 
-  mu3 = 0.1, 
-  mu4 = 0.2, 
-  mu5 = 0.05, 
-  mu6 = 0.1,
-  sig_dist = 0.15)
+  mu1 = 0.08*0.95, 
+  mu2 = 0.08*0.95, 
+  mu3 = 0.10216940*0.95, 
+  mu4 = 0.07167906*0.95, 
+  mu5 = 0.1, 
+  mu6 = 0.08357607*0.95,
+  sig_dist = 0.5)
 
 
 m1_A = mle2(minuslogl = cov_loglik,
@@ -83,12 +83,126 @@ m1_A = mle2(minuslogl = cov_loglik,
   
 full <- summary(m1_A)
 
-dt <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
+dt_cov <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(param = c("mu1", "mu2", "mu3", "mu4", "mu5", "mu6", "sig_dist")) %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
 
+write.csv(dt_cov, "calibration_cov.csv", row.names = FALSE)
 ```
+## Observe seasonality
+
+```{R}
+dt_cov <- read.csv('calibration_cov.csv')
+
+cov_mu_estimates <- dt_cov$Estimate
+# set seasonality
+set_mat <- seas_matrix(cov_mu_estimates[1]*0.95, cov_mu_estimates[2]*0.95, cov_mu_estimates[3]*0.95, 
+                         cov_mu_estimates[4]*0.95, cov_mu_estimates[5]*0.95, cov_mu_estimates[6]*0.95)
+  ## make sure beta is defined globally so that it actually passes into the seir function
+
+beta_COV <<- function(t){
+    seas_function(t, matrix = set_mat)}
+
+run_init <- init
+
+pr <- 0.01
+pexp <- 0.0001
+pinf <- 0.0001
+
+paras <- currvac_parms
+
+## Set up initial conditions 
+run_init["S_C"] <- (1-pinf)*(1-pr)*(1-pexp)*run_init["S_C"]
+run_init["E_C_COV"] <- (1-paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_C"]
+run_init["I_C_COV"] <- (1-paras["vaccC_COV"])*(1-paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
+run_init["H_C_COV"] <- (1-paras["vaccC_COV"])*(paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
+run_init["E_C_COV_vax"] <- (paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_C"]
+run_init["I_C_COV_vax"] <- (paras["vaccC_COV"])*(1-paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
+run_init["H_C_COV_vax"] <- (paras["vaccC_COV"])*(paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
+
+run_init["R_C_COV"] <- pr*init["S_C"]
+
+run_init["S_OC"] <- (1-pinf)*((1-pr)*run_init["S_OC"])
+run_init["E_OC_COV"] <- (1-paras["vaccOC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_OC"]
+run_init["I_OC_COV"] <- (1-paras["vaccOC_COV"])*(1-paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
+run_init["H_OC_COV"] <- (1-paras["vaccOC_COV"])*(paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
+run_init["E_OC_COV_vax"] <- (paras["vaccOC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_OC"]
+run_init["I_OC_COV_vax"] <- (paras["vaccOC_COV"])*(1-paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
+run_init["H_OC_COV_vax"] <- (paras["vaccOC_COV"])*(paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
+
+run_init["R_OC_COV"] <- pr*init["S_OC"]
+
+run_init["S_A"] <- (1-pinf)*((1-pr)*run_init["S_A"])
+run_init["E_A_COV"] <- (1-paras["vaccA_COV"])*pexp*(1-pinf)*(1-pr)*init["S_A"]
+run_init["I_A_COV"] <- (1-paras["vaccA_COV"])*(1-paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
+run_init["H_A_COV"] <- (1-paras["vaccA_COV"])*(paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
+run_init["E_A_COV_vax"] <- (paras["vaccA_COV"])*pexp*(1-pinf)*(1-pr)*init["S_A"]
+run_init["I_A_COV_vax"] <- (paras["vaccA_COV"])*(1-paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
+run_init["H_A_COV_vax"] <- (paras["vaccA_COV"])*(paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
+
+run_init["R_A_COV"] <- pr*init["S_A"]
+
+run_init["S_S"] <- (1-pinf)*((1-pr)*run_init["S_S"])
+run_init["E_S_COV"] <- (1-paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
+run_init["I_S_COV"] <- (1-paras["vaccS_COV"])*(1-paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
+run_init["H_S_COV"] <- (1-paras["vaccS_COV"])*(paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
+run_init["E_S_COV_vax"] <- (paras["vaccS_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
+run_init["I_S_COV_vax"] <- (paras["vaccS_COV"])*(1-paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
+run_init["H_S_COV_vax"] <- (paras["vaccS_COV"])*(paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
+
+run_init["R_S_COV"] <- pr*init["S_S"]
+
+
+run_init <- run_init[c("S_C", "S_OC", "S_A", "S_S",
+           "E_C_COV_vax", "I_C_COV_vax", "H_C_COV_vax", "D_C_COV_vax",
+           "E_C_COV", "I_C_COV", "H_C_COV", "D_C_COV", "R_C_COV",
+           
+           "E_OC_COV_vax", "I_OC_COV_vax", "H_OC_COV_vax", "D_OC_COV_vax",
+           "E_OC_COV", "I_OC_COV", "H_OC_COV", "D_OC_COV", "R_OC_COV",
+           
+           "E_A_COV_vax", "I_A_COV_vax", "H_A_COV_vax", "D_A_COV_vax",
+           "E_A_COV", "I_A_COV", "H_A_COV", "D_A_COV", "R_A_COV",
+           
+           "E_S_COV_vax", "I_S_COV_vax", "H_S_COV_vax", "D_S_COV_vax",
+           "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV", "R_S_COV")]
+  
+
+test_out <- run_ode(run_init, seir_COV, 0:700  , currvac_parms)
+# plot_total_infections(test_out, 0, 3500)
+# plot_total_hosp(test_out, 0, 3500)
+```
+
+```{R}
+plot_simulated_against_observed <- function(simulated_df, observed_df){
+  # Filter for just hospitalizations in simulation
+  simulated_df <- simulated_df %>% filter(type=="Hospitalized") %>%
+    group_by(time) %>%
+    summarise(simulated_hosps = sum(value)) %>%
+    mutate(t_cycle = (time - 1) %% 365 + 1)
+  print(simulated_df)
+  # Join based on day (t in simulated, day in observed)
+  combined <- simulated_df %>% inner_join(observed_df, by = c("t_cycle" = "day"))
+  plot_data <- combined %>%
+    pivot_longer(
+      cols = c(simulated_hosps, observed_hosps), 
+      names_to = "source", 
+      values_to = "total"
+    )
+   ggplot(plot_data, aes(x = time, y = total, color = source)) +
+    geom_line(alpha = 0.8) +
+    scale_color_manual(values = c("simulated_hosps" = "red", "observed_hosps" = "black")) +
+    labs(
+      title = "Simulated vs Observed",
+      x = "Day",
+      y = "Hospitalizations"
+    ) 
+} 
+ 
+
+plot_simulated_against_observed(test_out, cov_data)
+```
+
 # RSV Params
 ```{R} 
 rsv_data <- data %>% filter(Condition == "RSV") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
@@ -107,12 +221,12 @@ upper_limit = list(
 )
 
 lower_limit = list(
-  mu1 = 0.05, 
-  mu2 = 0.05, 
-  mu3 = 0.05, 
+  mu1 = 0.001, 
+  mu2 = 0.001, 
+  mu3 = 0.001, 
   mu4 = 0.05, 
   mu5 = 0.05, 
-  mu6 = 0.05, 
+  mu6 = 0.001, 
   sig_dist = 0.05
 )
 
@@ -145,6 +259,8 @@ dt_RSV <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
 
+write.csv(dt_RSV, "calibration_rsv.csv", row.names = FALSE)
+
 ```
 # Flu Params
 ```{R} 
@@ -166,7 +282,7 @@ upper_limit = list(
 lower_limit = list(
   mu1 = 0.05, 
   mu2 = 0.05, 
-  mu3 = 0.05, 
+  mu3 = 0.01, 
   mu4 = 0.05, 
   mu5 = 0.05, 
   mu6 = 0.05, 
@@ -179,7 +295,7 @@ pinf <- 0.001
 start = list(
   mu1 = 0.1, 
   mu2 = 0.1, 
-  mu3 = 0.1, 
+  mu3 = 0.05, 
   mu4 = 0.2, 
   mu5 = 0.05, 
   mu6 = 0.1,
@@ -201,4 +317,78 @@ dt_flu <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(param = c("mu1", "mu2", "mu3", "mu4", "mu5", "mu6", "sig_dist")) %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
+
+write.csv(dt_flu, "calibration_flu.csv", row.names = FALSE)
+```
+
+## RSV
+```{R}
+dt_RSV <- read.csv("rsv_calibration.csv")
+
+rsv_mu_estimates <- dt_RSV$Estimate
+# set seasonality
+set_mat <- seas_matrix(rsv_mu_estimates[1], rsv_mu_estimates[2], rsv_mu_estimates[3], 
+                         rsv_mu_estimates[4], rsv_mu_estimates[5], rsv_mu_estimates[6])
+  ## make sure mu is defined globally so that it actually passes into the seir function
+beta_RSV <<- function(t){
+    seas_function(t, matrix = set_mat)}
+
+RSV_init <- init[c("S_C", "S_OC", "S_A", "S_S",
+                     "E_C_RSV_vax", "I_C_RSV_vax", "H_C_RSV_vax", "D_C_RSV_vax",
+                     "E_C_RSV", "I_C_RSV", "H_C_RSV", "D_C_RSV", "R_C_RSV",
+                     
+                     "E_OC_RSV_vax", "I_OC_RSV_vax", "H_OC_RSV_vax", "D_OC_RSV_vax",
+                     "E_OC_RSV", "I_OC_RSV", "H_OC_RSV", "D_OC_RSV", "R_OC_RSV",
+                     
+                     "E_A_RSV_vax", "I_A_RSV_vax", "H_A_RSV_vax", "D_A_RSV_vax",
+                     "E_A_RSV", "I_A_RSV", "H_A_RSV", "D_A_RSV", "R_A_RSV",
+                     
+                     "E_S_RSV_vax", "I_S_RSV_vax", "H_S_RSV_vax", "D_S_RSV_vax",
+                     "E_S_RSV", "I_S_RSV", "H_S_RSV", "D_S_RSV", "R_S_RSV")]
+
+test_out_RSV <- run_ode(RSV_init, seir_RSV, 0:5000, currvac_parms)
+plot_total_infections(test_out_RSV, 0, 3500)
+plot_total_hosp(test_out_RSV, 0, 3500)
+```
+## RSV
+```{R}
+
+dt_flu <- read.csv("calibration_flu.csv")
+
+flu_mu_estimates <- dt_flu$Estimate
+# set seasonality
+set_mat <- seas_matrix(flu_mu_estimates[1], flu_mu_estimates[2], flu_mu_estimates[3], 
+                         flu_mu_estimates[4], flu_mu_estimates[5], flu_mu_estimates[6])
+  ## make sure mu is defined globally so that it actually passes into the seir function
+beta_FLU <<- function(t){
+    seas_function(t, matrix = set_mat)}
+
+FLU_init <- init[c("S_C", "S_OC", "S_A", "S_S",
+                     "E_C_FLU_vax", "I_C_FLU_vax", "H_C_FLU_vax", "D_C_FLU_vax",
+                     "E_C_FLU", "I_C_FLU", "H_C_FLU", "D_C_FLU", "R_C_FLU",
+                     
+                     "E_OC_FLU_vax", "I_OC_FLU_vax", "H_OC_FLU_vax", "D_OC_FLU_vax",
+                     "E_OC_FLU", "I_OC_FLU", "H_OC_FLU", "D_OC_FLU", "R_OC_FLU",
+                     
+                     "E_A_FLU_vax", "I_A_FLU_vax", "H_A_FLU_vax", "D_A_FLU_vax",
+                     "E_A_FLU", "I_A_FLU", "H_A_FLU", "D_A_FLU", "R_A_FLU",
+                     
+                     "E_S_FLU_vax", "I_S_FLU_vax", "H_S_FLU_vax", "D_S_FLU_vax",
+                     "E_S_FLU", "I_S_FLU", "H_S_FLU", "D_S_FLU", "R_S_FLU")]
+
+test_out_FLU <- run_ode(FLU_init, seir_FLU, 0:5000, currvac_parms)
+plot_total_infections(test_out_FLU, 0, 3500)
+plot_total_hosp(test_out_FLU, 0, 3500)
+```
+
+## Attempt Tripledemic
+
+```{R}
+times <- 1:5000
+test_currvac <- run_ode(init=init, seir_fn=seir, times=times, parms=currvac_parms)
+plot_total_infections(test_currvac, 1095, 1461)
+```
+
+```{R}
+plot_total_hosp_by_pathogen(test_currvac, 1095, 1461)
 ```

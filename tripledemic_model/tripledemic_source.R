@@ -180,21 +180,43 @@ plot_total_infections <- function(df, tmin, tmax) {
   grouped_df <- df %>% filter(type=="Infected") %>%
     filter(time >= tmin) %>%
     filter(time <= tmax) %>%
-    group_by(disease_group, date) %>%
+    group_by(disease_group, time) %>%
     summarise(total = sum(value)) 
   print(names(grouped_df))
   plot <- grouped_df %>%
-    ggplot(aes(x=date, y=total, color=disease_group)) + 
+    ggplot(aes(x=time, y=total, color=disease_group)) + 
     geom_line() + 
     ylab("Population Infected (Count)") + 
     xlab("Time (Month)") + 
     labs(color = "Pathogen") +
-    scale_x_date(
-      date_labels = "%b",
-      date_breaks = "1 month"
-    ) +
+    # scale_x_date(
+    #   date_labels = "%b",
+    #   date_breaks = "1 month"
+   #  ) +
     scale_color_paletteer_d("tvthemes::Alexandrite") +
     ggtitle(paste("Total Infections by Pathogen (Count)"))
+  return(plot)
+}
+
+plot_total_hosp_by_pathogen <- function(df, tmin, tmax) {
+  grouped_df <- df %>% filter(type=="Hospitalized") %>%
+    filter(time >= tmin) %>%
+    filter(time <= tmax) %>%
+    group_by(disease_group, time) %>%
+    summarise(total = sum(value)) 
+  print(names(grouped_df))
+  plot <- grouped_df %>%
+    ggplot(aes(x=time, y=total, color=disease_group)) + 
+    geom_line() + 
+    ylab("Population Hospitalized (Count)") + 
+    xlab("Time (Month)") + 
+    labs(color = "Pathogen") +
+    # scale_x_date(
+    #   date_labels = "%b",
+    #   date_breaks = "1 month"
+    #  ) +
+    scale_color_paletteer_d("tvthemes::Alexandrite") +
+    ggtitle(paste("Total Hospitalizations by Pathogen (Count)"))
   return(plot)
 }
 

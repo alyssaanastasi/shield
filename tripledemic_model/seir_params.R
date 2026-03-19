@@ -250,7 +250,7 @@ currvac_parms <- c(   #R0 - 3
               probHA_COV = 0.0026015249282712754, probHA_COV_vax = .5*0.0026015249282712754,
               probHS_COV = 0.03686573055858461, probHS_COV_vax = .5*0.03686573055858461,
               ss_COV = 0.5, si_COV = 0.5,
-              vaccC_COV = 0.068, vaccOC_COV = 0.054, vaccA_COV = 0.101, vaccS_COV = 0.303,
+              vaccC_COV = 0.179, vaccOC_COV = 0.457, vaccA_COV = 0.524, vaccS_COV = 0.787,
               ve_COV = (1-.94),
               
               # R0 - 3

@@ -9,16 +9,16 @@ seir_COV <- function(t, y, pars) {
  
   
   COV_C = c(E_C_COV_vax, I_C_COV_vax, H_C_COV_vax,
-            E_C_COV, I_C_COV, H_C_COV)
+            E_C_COV, I_C_COV, H_C_COV, R_C_COV)
   
   COV_OC = c(E_OC_COV_vax, I_OC_COV_vax, H_OC_COV_vax,
-             E_OC_COV, I_OC_COV, H_OC_COV)
+             E_OC_COV, I_OC_COV, H_OC_COV, R_OC_COV)
   
   COV_A = c(E_A_COV_vax, I_A_COV_vax, H_A_COV_vax,
-            E_A_COV, I_A_COV, H_A_COV)
+            E_A_COV, I_A_COV, H_A_COV, R_A_COV)
   
   COV_S = c(E_S_COV_vax, I_S_COV_vax, H_S_COV_vax,
-            E_S_COV, I_S_COV, H_S_COV)
+            E_S_COV, I_S_COV, H_S_COV, R_S_COV)
   
   
   sumIC_COV <- I_C_COV + si_COV*I_C_COV_vax + H_C_COV + si_COV*H_C_COV_vax
@@ -393,7 +393,7 @@ seas_function <- function(t, matrix){
   return(mu)
 }
 
-cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
+cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6, sig_dist) {
   
   # First, feed in standard parms
   paras <- currvac_parms
@@ -417,11 +417,10 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
   pr <- 0.01
   pexp <- 0.0001
   pinf <- 0.0001
-  
   run_init <- init
   
   ## Set up initial conditions 
-  run_init["S_C"] <- (1-pinf)*(1-pr)*(1-pexp)*run_init["S_C"]
+  run_init["S_C"] <- (1-pinf)*(1-pr)*(1-pexp)*init["S_C"]
   run_init["E_C_COV"] <- (1-paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_C"]
   run_init["I_C_COV"] <- (1-paras["vaccC_COV"])*(1-paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
   run_init["H_C_COV"] <- (1-paras["vaccC_COV"])*(paras['probHC_COV'])*pinf*((1-pr)*init["S_C"])
@@ -431,7 +430,7 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
   
   run_init["R_C_COV"] <- pr*init["S_C"]
   
-  run_init["S_OC"] <- (1-pinf)*((1-pr)*run_init["S_OC"])
+  run_init["S_OC"] <- (1-pinf)*((1-pr)*(1-pexp)*init["S_OC"])
   run_init["E_OC_COV"] <- (1-paras["vaccOC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_OC"]
   run_init["I_OC_COV"] <- (1-paras["vaccOC_COV"])*(1-paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
   run_init["H_OC_COV"] <- (1-paras["vaccOC_COV"])*(paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
@@ -441,7 +440,7 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
   
   run_init["R_OC_COV"] <- pr*init["S_OC"]
   
-  run_init["S_A"] <- (1-pinf)*((1-pr)*run_init["S_A"])
+  run_init["S_A"] <- (1-pinf)*((1-pr)*(1-pexp)*init["S_A"])
   run_init["E_A_COV"] <- (1-paras["vaccA_COV"])*pexp*(1-pinf)*(1-pr)*init["S_A"]
   run_init["I_A_COV"] <- (1-paras["vaccA_COV"])*(1-paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
   run_init["H_A_COV"] <- (1-paras["vaccA_COV"])*(paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
@@ -451,8 +450,8 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
   
   run_init["R_A_COV"] <- pr*init["S_A"]
   
-  run_init["S_S"] <- (1-pinf)*((1-pr)*run_init["S_S"])
-  run_init["E_S_COV"] <- (1-paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
+  run_init["S_S"] <- (1-pinf)*((1-pr)*(1-pexp)*init["S_S"])
+  run_init["E_S_COV"] <- (1-paras["vaccS_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
   run_init["I_S_COV"] <- (1-paras["vaccS_COV"])*(1-paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
   run_init["H_S_COV"] <- (1-paras["vaccS_COV"])*(paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
   run_init["E_S_COV_vax"] <- (paras["vaccS_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
@@ -495,12 +494,12 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
     select(time, 
            H_C_COV_vax, H_C_COV, 
            H_OC_COV_vax, H_OC_COV,
-           H_A_COV_vax, H_A_COV_vax,
+           H_A_COV_vax, H_A_COV,
            H_S_COV_vax, H_S_COV
     ) %>%
     group_by(time) %>%
     reframe(
-      model_hosps = H_C_COV_vax + H_C_COV + H_OC_COV_vax + H_OC_COV + H_A_COV_vax + H_A_COV_vax + H_S_COV_vax + H_S_COV
+      model_hosps = H_C_COV_vax + H_C_COV + H_OC_COV_vax + H_OC_COV + H_A_COV + H_A_COV_vax + H_S_COV_vax + H_S_COV
     ) %>%
     arrange(time) %>%
     filter(time %in% cov_data$day) %>% 
@@ -632,10 +631,10 @@ flu_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
     seas_function(t, matrix = set_mat)
   }
   
-  # print("Try: ------------------")
-  # print(c(mu_janfeb, mu_marapr, mu_mayjun,
-  #                        mu_julaug, mu_septoct, mu_novdec))
-  # print("-----------------------")
+  print("Try: ------------------")
+  print(c(mu1, mu2, mu3,
+          mu4, mu5, mu6))
+  print("-----------------------")
   
   # set initial conditions
   #pr ## prop recovered
@@ -708,8 +707,3 @@ flu_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6,sig_dist) {
   return(ll_final)
 }
 
-plot_simulated_against_observed <- function(simulated_df, observed_df){
-  # Join based on day (t in simulated, day in observed)
-  combined <- simulated_df %>% outer_join(observed_df, by = c("t" = "day"))
-  return(combined)
-}

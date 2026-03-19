@@ -38,8 +38,8 @@ run_ode <- function(init, seir_fn, times, parms){
     group_by(time, age_group, vacc_type) %>% 
     mutate(total_value = sum(value),
            vacc_percent = (value / total_value) * 100) %>%
-    ungroup() %>%
-    mutate(date = as.Date(time, origin = "2020-01-01"))
+    ungroup() # %>%
+   # mutate(date = as.Date(time, origin = "2020-01-01"))
   df$age_groupf = factor(df$age_group, levels=c("Children", "Older Children", "Adults", "Seniors"))
   return(df)
 }

@@ -13,6 +13,9 @@ library(broom)
 library(dplyr)
 library(paletteer)
 
+#survey analysis
+library(srvyr)
+
 
 ## calibration
 library(bbmle)
@@ -20,8 +23,6 @@ library(mgcv)
 
 source("seir_params.R")
 source("calibration_source.R")
-source("tripledemic_source.R")
-source("seir.R")
 ```
 
 # Load ICU Data
@@ -35,40 +36,95 @@ data <- data[order(data$date), ]
 data <- data[!duplicated(data), ]
 ```
 
+# Get vaccination parameters from Survey
+```{R}
+# Age Bands -> 0-5, 6-18, 18-65, 65+
+adult_vaccine_sample <- read.csv("vaccines_sample_adult.csv")
+
+adult_design <- adult_vaccine_sample %>%
+  as_survey_design(weights = weightvec)
+
+
+adult_survey_filtered <- adult_design %>% 
+  filter(self_age %in% c('19-29', '30-39', '40-49', '50-59'))
+
+adults_results <- adult_survey_filtered %>% 
+  summarize(
+    prop_vax = survey_mean(covid_vax == 1, na.rm = TRUE, vartype = "ci")
+  )
+
+print(adults_results)
+
+senior_filter <- adult_design %>% 
+  filter(self_age %in% c('60-69', '70-79', '80+'))
+
+senior_results <- senior_filter %>% 
+  summarize(
+    prop_vax = survey_mean(covid_vax == 1, na.rm = TRUE, vartype = "ci")
+  )
+
+print(senior_results)
+
+child_vaccine_sample <- read.csv("vaccines_sample_child.csv")
+
+child_design <- child_vaccine_sample %>%
+  as_survey_design(weights = weightvec)
+
+baby_filter <- child_design %>% 
+  filter(child_age %in% c('0-5'))
+
+baby_results <- baby_filter %>% 
+  summarize(
+    prop_vax = survey_mean(covid_vax == 1, na.rm = TRUE, vartype = "ci")
+  )
+
+print(baby_results)
+
+adolescent_filter <- child_design %>% 
+  filter(child_age %in% c('6-18'))
+
+adolescent_results <- adolescent_filter %>% 
+  summarize(
+    prop_vax = survey_mean(covid_vax == 1, na.rm = TRUE, vartype = "ci")
+  )
+
+print(adolescent_results)
+```
+
 # COVID-19 Params
-```{R} 
+```{R}  
 cov_data <- data %>% filter(Condition == "COVID-19") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
 
 ## Set parameter boundaries
 
 #### Set bounds ####
 upper_limit = list(
-  mu1 = 0.2, 
-  mu2 = 0.2, 
-  mu3 = 0.2, 
-  mu4 = 0.2, 
-  mu5 = 0.2, 
-  mu6 = 0.2, 
+  mu1 = 0.5, 
+  mu2 = 0.5, 
+  mu3 = 0.5, 
+  mu4 = 0.5, 
+  mu5 = 0.5, 
+  mu6 = 0.5, 
   sig_dist = 5
 )
 
 lower_limit = list(
-  mu1 = 0.001, 
-  mu2 = 0.001, 
-  mu3 = 0.001, 
-  mu4 = 0.001, 
-  mu5 = 0.001, 
-  mu6 = 0.001, 
+  mu1 = 0.05, 
+  mu2 = 0.05, 
+  mu3 = 0.05, 
+  mu4 = 0.05, 
+  mu5 = 0.05, 
+  mu6 = 0.05, 
   sig_dist = 0.05
 )
 
 start = list(
-  mu1 = 0.08*0.95, 
-  mu2 = 0.08*0.95, 
-  mu3 = 0.10216940*0.95, 
-  mu4 = 0.07167906*0.95, 
-  mu5 = 0.1, 
-  mu6 = 0.08357607*0.95,
+  mu1 = 0.25, 
+  mu2 = 0.25, 
+  mu3 = 0.25, 
+  mu4 = 0.25, 
+  mu5 = 0.25, 
+  mu6 = 0.25,
   sig_dist = 0.5)
 
 
@@ -97,8 +153,8 @@ dt_cov <- read.csv('calibration_cov.csv')
 
 cov_mu_estimates <- dt_cov$Estimate
 # set seasonality
-set_mat <- seas_matrix(cov_mu_estimates[1]*0.95, cov_mu_estimates[2]*0.95, cov_mu_estimates[3]*0.95, 
-                         cov_mu_estimates[4]*0.95, cov_mu_estimates[5]*0.95, cov_mu_estimates[6]*0.95)
+set_mat <- seas_matrix(cov_mu_estimates[1], cov_mu_estimates[2], cov_mu_estimates[3], 
+                         cov_mu_estimates[4], cov_mu_estimates[5], cov_mu_estimates[6])
   ## make sure beta is defined globally so that it actually passes into the seir function
 
 beta_COV <<- function(t){
@@ -123,7 +179,7 @@ run_init["H_C_COV_vax"] <- (paras["vaccC_COV"])*(paras['probHC_COV'])*pinf*((1-p
 
 run_init["R_C_COV"] <- pr*init["S_C"]
 
-run_init["S_OC"] <- (1-pinf)*((1-pr)*run_init["S_OC"])
+run_init["S_OC"] <- (1-pinf)*((1-pr)*(1-pexp)*run_init["S_OC"])
 run_init["E_OC_COV"] <- (1-paras["vaccOC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_OC"]
 run_init["I_OC_COV"] <- (1-paras["vaccOC_COV"])*(1-paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
 run_init["H_OC_COV"] <- (1-paras["vaccOC_COV"])*(paras['probHOC_COV'])*pinf*((1-pr)*init["S_OC"])
@@ -133,7 +189,7 @@ run_init["H_OC_COV_vax"] <- (paras["vaccOC_COV"])*(paras['probHOC_COV'])*pinf*((
 
 run_init["R_OC_COV"] <- pr*init["S_OC"]
 
-run_init["S_A"] <- (1-pinf)*((1-pr)*run_init["S_A"])
+run_init["S_A"] <- (1-pinf)*((1-pr)*(1-pexp)*run_init["S_A"])
 run_init["E_A_COV"] <- (1-paras["vaccA_COV"])*pexp*(1-pinf)*(1-pr)*init["S_A"]
 run_init["I_A_COV"] <- (1-paras["vaccA_COV"])*(1-paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
 run_init["H_A_COV"] <- (1-paras["vaccA_COV"])*(paras['probHA_COV'])*pinf*((1-pr)*init["S_A"])
@@ -143,8 +199,8 @@ run_init["H_A_COV_vax"] <- (paras["vaccA_COV"])*(paras['probHA_COV'])*pinf*((1-p
 
 run_init["R_A_COV"] <- pr*init["S_A"]
 
-run_init["S_S"] <- (1-pinf)*((1-pr)*run_init["S_S"])
-run_init["E_S_COV"] <- (1-paras["vaccC_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
+run_init["S_S"] <- (1-pinf)*((1-pr)*(1-pexp)*run_init["S_S"])
+run_init["E_S_COV"] <- (1-paras["vaccS_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
 run_init["I_S_COV"] <- (1-paras["vaccS_COV"])*(1-paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
 run_init["H_S_COV"] <- (1-paras["vaccS_COV"])*(paras['probHS_COV'])*pinf*((1-pr)*init["S_S"])
 run_init["E_S_COV_vax"] <- (paras["vaccS_COV"])*pexp*(1-pinf)*(1-pr)*init["S_S"]
@@ -172,6 +228,13 @@ test_out <- run_ode(run_init, seir_COV, 0:700  , currvac_parms)
 # plot_total_infections(test_out, 0, 3500)
 # plot_total_hosp(test_out, 0, 3500)
 ```
+
+```{R}
+# Check Sums 
+test_sums <- test_out %>% group_by(time) %>% summarise(total_at_time = sum(value))
+
+```
+
 
 ```{R}
 plot_simulated_against_observed <- function(simulated_df, observed_df){
@@ -203,6 +266,22 @@ plot_simulated_against_observed <- function(simulated_df, observed_df){
 plot_simulated_against_observed(test_out, cov_data)
 ```
 
+
+```{R}
+
+plot_df <- test_out %>% filter(type != "Susceptible") %>% group_by(type, time) %>% summarise(overall = sum(value))
+
+ggplot(plot_df, aes(x = time, y = overall, color=type)) +
+    geom_line(alpha = 0.8) +
+    labs(
+      title = "Test Output",
+      x = "Day",
+      y = "Simulated Value"
+) 
+```
+```{R}
+beta_COV(2)
+```
 # RSV Params
 ```{R} 
 rsv_data <- data %>% filter(Condition == "RSV") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)

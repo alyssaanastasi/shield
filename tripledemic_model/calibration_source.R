@@ -414,7 +414,7 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6, sig_dist) {
   #pr ## prop recovered
   #pinf ## prop currently infected of non-recovered individuals
   
-  pr <- 0.01
+  pr <- 0.1
   pexp <- 0.0001
   pinf <- 0.0001
   run_init <- init
@@ -477,7 +477,7 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6, sig_dist) {
   # print(run_init)
   
   # Set times
-  times <- 0:365
+  times <- 0:max(cov_data$day)
   
   #vec_print <- c(mu1, mu2, mu3, 
   #               mu4, mu5, mu_novdec,

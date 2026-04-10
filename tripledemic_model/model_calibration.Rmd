@@ -31,7 +31,7 @@ source("calibration_source.R")
 data <- read.csv('ICU_data.csv')
 
 #Clean data 
-data$date <- as.Date(data$Hour.of.Week.Ending, format = "%d-%b-%y")
+data$date <- as.Date(data$Day.of.Week.Ending, format = "%d-%b-%y")
 data <- data[order(data$date), ]
 data <- data[!duplicated(data), ]
 ```
@@ -93,39 +93,39 @@ print(adolescent_results)
 
 # COVID-19 Params
 ```{R}  
-cov_data <- data %>% filter(Condition == "COVID-19") %>% filter(date < as.Date("2025-05-24")) %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
+cov_data <- data %>% filter(Condition == "COVID-19") %>% mutate(day = (row_number()-1)*7) %>% rename(observed_hosps = Case.Count)
 
 ## Set parameter boundaries
 
 #### Set bounds ####
 upper_limit = list(
-  mu1 = 0.5, 
-  mu2 = 0.5, 
-  mu3 = 0.5, 
-  mu4 = 0.5, 
-  mu5 = 0.5, 
-  mu6 = 0.5, 
+  mu1 = 0.25, 
+  mu2 = 0.25, 
+  mu3 = 0.30, 
+  mu4 = 0.25, 
+  mu5 = 0.25, 
+  mu6 = 0.25, 
   sig_dist = 5
 )
 
 lower_limit = list(
-  mu1 = 0.05, 
-  mu2 = 0.05, 
-  mu3 = 0.05, 
-  mu4 = 0.05, 
-  mu5 = 0.05, 
-  mu6 = 0.05, 
+  mu1 = 0.005, 
+  mu2 = 0.005, 
+  mu3 = 0.005, 
+  mu4 = 0.005, 
+  mu5 = 0.005, 
+  mu6 = 0.005, 
   sig_dist = 0.05
 )
 
 start = list(
-  mu1 = 0.25, 
-  mu2 = 0.25, 
-  mu3 = 0.25, 
-  mu4 = 0.25, 
-  mu5 = 0.25, 
-  mu6 = 0.25,
-  sig_dist = 0.5)
+  mu1 = 0.15, 
+  mu2 = 0.15, 
+  mu3 = 0.15, 
+  mu4 = 0.15, 
+  mu5 = 0.15, 
+  mu6 = 0.15,
+  sig_dist = 0.3)
 
 
 m1_A = mle2(minuslogl = cov_loglik,
@@ -162,7 +162,7 @@ beta_COV <<- function(t){
 
 run_init <- init
 
-pr <- 0.01
+pr <- 0.08
 pexp <- 0.0001
 pinf <- 0.0001
 
@@ -224,7 +224,7 @@ run_init <- run_init[c("S_C", "S_OC", "S_A", "S_S",
            "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV", "R_S_COV")]
   
 
-test_out <- run_ode(run_init, seir_COV, 0:700  , currvac_parms)
+test_out <- run_ode(run_init, seir_COV, 0:2000  , currvac_parms)
 # plot_total_infections(test_out, 0, 3500)
 # plot_total_hosp(test_out, 0, 3500)
 ```
@@ -232,7 +232,6 @@ test_out <- run_ode(run_init, seir_COV, 0:700  , currvac_parms)
 ```{R}
 # Check Sums 
 test_sums <- test_out %>% group_by(time) %>% summarise(total_at_time = sum(value))
-
 ```
 
 
@@ -242,10 +241,10 @@ plot_simulated_against_observed <- function(simulated_df, observed_df){
   simulated_df <- simulated_df %>% filter(type=="Hospitalized") %>%
     group_by(time) %>%
     summarise(simulated_hosps = sum(value)) %>%
-    mutate(t_cycle = (time - 1) %% 365 + 1)
+    mutate(t_cycle = (time - 1) %% 679 + 1)
   print(simulated_df)
   # Join based on day (t in simulated, day in observed)
-  combined <- simulated_df %>% inner_join(observed_df, by = c("t_cycle" = "day"))
+  combined <<- simulated_df %>% inner_join(observed_df, by = c("t_cycle" = "day"))
   plot_data <- combined %>%
     pivot_longer(
       cols = c(simulated_hosps, observed_hosps), 

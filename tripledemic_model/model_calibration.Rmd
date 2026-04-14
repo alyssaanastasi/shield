@@ -109,22 +109,22 @@ upper_limit = list(
 )
 
 lower_limit = list(
-  mu1 = 0.005, 
-  mu2 = 0.005, 
-  mu3 = 0.005, 
-  mu4 = 0.005, 
-  mu5 = 0.005, 
-  mu6 = 0.005, 
+  mu1 = 0.0005, 
+  mu2 = 0.0005, 
+  mu3 = 0.0005, 
+  mu4 = 0.0005, 
+  mu5 = 0.0005, 
+  mu6 = 0.0005, 
   sig_dist = 0.05
 )
 
 start = list(
-  mu1 = 0.15, 
-  mu2 = 0.15, 
-  mu3 = 0.15, 
-  mu4 = 0.15, 
-  mu5 = 0.15, 
-  mu6 = 0.15,
+  mu1 = 0.10, 
+  mu2 = 0.05, 
+  mu3 = 0.12, 
+  mu4 = 0.05, 
+  mu5 = 0.12, 
+  mu6 = 0.12,
   sig_dist = 0.3)
 
 
@@ -144,7 +144,7 @@ dt_cov <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
 
-write.csv(dt_cov, "calibration_cov.csv", row.names = FALSE)
+write.csv(dt_cov, "calibration_cov_04-2.csv", row.names = FALSE)
 ```
 ## Observe seasonality
 
@@ -162,7 +162,7 @@ beta_COV <<- function(t){
 
 run_init <- init
 
-pr <- 0.08
+pr <- 0.1
 pexp <- 0.0001
 pinf <- 0.0001
 
@@ -224,7 +224,7 @@ run_init <- run_init[c("S_C", "S_OC", "S_A", "S_S",
            "E_S_COV", "I_S_COV", "H_S_COV", "D_S_COV", "R_S_COV")]
   
 
-test_out <- run_ode(run_init, seir_COV, 0:2000  , currvac_parms)
+test_out <- run_ode(run_init, seir_COV, 0:3000  , currvac_parms)
 # plot_total_infections(test_out, 0, 3500)
 # plot_total_hosp(test_out, 0, 3500)
 ```
@@ -241,7 +241,7 @@ plot_simulated_against_observed <- function(simulated_df, observed_df){
   simulated_df <- simulated_df %>% filter(type=="Hospitalized") %>%
     group_by(time) %>%
     summarise(simulated_hosps = sum(value)) %>%
-    mutate(t_cycle = (time - 1) %% 679 + 1)
+    mutate(t_cycle = (time - 1) %% 365 + 1)
   print(simulated_df)
   # Join based on day (t in simulated, day in observed)
   combined <<- simulated_df %>% inner_join(observed_df, by = c("t_cycle" = "day"))

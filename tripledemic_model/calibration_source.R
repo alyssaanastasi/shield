@@ -414,7 +414,7 @@ cov_loglik <- function(mu1, mu2, mu3, mu4, mu5, mu6, sig_dist) {
   #pr ## prop recovered
   #pinf ## prop currently infected of non-recovered individuals
   
-  pr <- 0.1
+  pr <- 0.04
   pexp <- 0.0001
   pinf <- 0.0001
   run_init <- init

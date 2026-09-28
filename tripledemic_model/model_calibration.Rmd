@@ -28,7 +28,7 @@ source("calibration_source.R")
 # Load ICU Data
 
 ```{R}
-data <- read.csv('ICU_data.csv')
+data <- read.csv('source_data/ICU_data.csv')
 
 #Clean data 
 data$date <- as.Date(data$Day.of.Week.Ending, format = "%d-%b-%y")
@@ -109,7 +109,7 @@ upper_limit = list(
 )
 
 lower_limit = list(
-  mu1 = 0.0005, 
+  mu1 = 0.00005, 
   mu2 = 0.0005, 
   mu3 = 0.0005, 
   mu4 = 0.0005, 
@@ -119,12 +119,12 @@ lower_limit = list(
 )
 
 start = list(
-  mu1 = 0.10, 
-  mu2 = 0.05, 
-  mu3 = 0.12, 
-  mu4 = 0.05, 
-  mu5 = 0.12, 
-  mu6 = 0.12,
+  mu1 = 0.158, 
+  mu2 = 0.039, 
+  mu3 = 0.241, 
+  mu4 = 0.0809, 
+  mu5 = 0.191, 
+  mu6 = 0.118,
   sig_dist = 0.3)
 
 
@@ -144,12 +144,12 @@ dt_cov <- data.table::as.data.table(coef(full), .keep.rownames = "word") %>%
   mutate(loglik = -m1_A@min,
          AIC = AICc(m1_A))
 
-write.csv(dt_cov, "calibration_cov_04-2.csv", row.names = FALSE)
+write.csv(dt_cov, "calibration_cov_change_start.csv", row.names = FALSE)
 ```
 ## Observe seasonality
 
 ```{R}
-dt_cov <- read.csv('calibration_cov.csv')
+dt_cov <- read.csv('calibration_cov_change_start.csv')
 
 cov_mu_estimates <- dt_cov$Estimate
 # set seasonality
@@ -162,7 +162,7 @@ beta_COV <<- function(t){
 
 run_init <- init
 
-pr <- 0.1
+pr <- 0.04
 pexp <- 0.0001
 pinf <- 0.0001
 
@@ -278,6 +278,8 @@ ggplot(plot_df, aes(x = time, y = overall, color=type)) +
       y = "Simulated Value"
 ) 
 ```
+
+
 ```{R}
 beta_COV(2)
 ```

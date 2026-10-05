@@ -1,0 +1,87 @@
+---
+title: "Playground"
+author: "Alyssa Anastasi"
+date: "2026-10-05"
+output: html_document
+---
+
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(deSolve)
+library(tidyverse)
+library(MetBrewer)
+library(directlabels)
+library(cowplot)
+library(viridis)
+library(RColorBrewer)
+library(ggrepel)
+library(spatstat.utils)
+library(paletteer)
+library(bbmle)
+library(mgcv)
+source("tripledemic_model/seir_params.R")
+source("tripledemic_model/seir_COV.R")
+```
+
+# Start variables
+```{r}
+
+n <- 12e6
+I_COV <- 10
+
+curr_y <-  c(
+  S = n - I_COV,
+  
+  E_COV_vax = 0,
+  I_COV_vax = 0,
+  H_COV_vax = 0,
+  D_COV_vax = 0,
+  
+  E_COV = 0,
+  I_COV = I_COV,
+  H_COV = 0,
+  D_COV = 0,
+  R_COV = 0
+)
+
+pars <- c(beta_COV=0.6, epsilon_COV = 1/3, omega_COV = 1/(6*30), 
+          gammaI_COV = 1/5, gammaH_COV = 1/15, 
+              alpha_COV = 0.09281291984653527, 
+              probH_COV = 0.0026015249282712754, probH_COV_vax = .5*0.0026015249282712754,
+              ss_COV = 0.5, si_COV = 0.5,
+              vacc_COV = 0.524, 
+              ve_COV = (1-.94))
+
+times <- 0:720
+
+```
+
+# Run SEIR COV IDE
+```{R}
+out <- ode(y = curr_y, times = times, func = seir_COV, parms = pars)
+
+plot(out)
+```
+
+```{R}
+library(ggplot2)
+library(tidyr)
+
+df <- as.data.frame(out)
+
+# Combine vaccinated and unvaccinated branches
+df$E <- df$E_COV + df$E_COV_vax
+df$I <- df$I_COV + df$I_COV_vax
+df$H <- df$H_COV + df$H_COV_vax
+
+df_long <- pivot_longer(df, cols = c(E, I, H, R_COV, D_COV),
+                        names_to = "compartment", values_to = "count")
+
+ggplot(df_long, aes(x = time, y = count, color = compartment)) +
+  geom_line(linewidth = 1) +
+  labs(x = "Time (days)", y = "Number of people", color = "Compartment") +
+  theme_minimal()
+
+```
+

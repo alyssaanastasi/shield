@@ -23,7 +23,7 @@ seir_COV <- function(t, y, pars) {
   pop <- S + sum(COV_all)
   
   # Force of infection (single homogeneous population, so no contact matrix)
-  lambda_COV <- beta_COV(t)*sumI_COV/pop
+  lambda_COV <- beta_COV*sumI_COV/pop
   
   prop_can_be_hospitalized <- 1
   
